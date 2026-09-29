@@ -1,72 +1,221 @@
-# Explanation — 049 — Day 5: Network Security (Free Capsule Course)
+# Network Security Day 5 — Active/Passive Recon, WHOIS, DNS, Shodan aur Wayback (Hinglish Explanation)
 
-**Source:** `transcripts/049 - Day-5 Network Security Free Capsule Course [ Hindi ].hi-orig.srt`
-**Translation:** `english/049 - Day-5 Network Security Free Capsule Course.md`
-**Level:** Beginner security, Day 5 (trainer **Ayush Pathak**) — the **reconnaissance** lecture: the ethical-hacking chain, active vs passive recon, then hands-on with **whois, dig/nslookup, dnsdumpster, Shodan, VirusTotal, and the Wayback Machine**.
+**Source transcript:** `transcripts/049 - Day-5 Network Security Free Capsule Course [ Hindi ].hi-orig.srt`
+**Trainer in transcript:** Ayush Pathak
+**Builds on:** Network Days 1–4 — addressing, VPN lab, ports and Metasploitable setup
+**Continues:** Day 6 browser/ping/traceroute/Telnet/Netcat diagnostics
+**Note:** Ye exact matching Hindi transcript ko context ke saath samajh kar likha gaya hai. Recon tools ko passive/public or explicitly authorized scope mein use karo; Shodan/DNS data ko exploit permission mat samjho.
 
 ---
 
-## 1. Framing — where attacks start
+## 1. Reconnaissance kya hai?
 
-After four theory lectures (fundamentals module), the series enters the security module's first room. Two orienting pictures are drawn before any tool:
+Attack/security assessment ka information-gathering phase reconnaissance hai:
 
-- **The 5-step ethical-hacking chain:** **recon → scanning/enumeration → gaining access (win an initial foothold) → maintaining access (persistence) → clearing tracks** — presented as a general, *iterative/cyclic* process, not a strict once-through pipeline.
-- **The 3-band kill-chain diagram:** *getting in* (recon → resource development → **delivery** → **exploitation** past their protection) → *hacking through* (**persistence** → **command & control** of the target → **discovery** → privilege escalation → **lateral movement** inside the network → **collection/exfiltration**) → *taking it out* (**impact / objectives**). His promise: the track is a skeleton; he'll bolt on extras throughout.
+- target/domain inventory,
+- public IP/DNS,
+- subdomains,
+- historical pages,
+- exposed services/devices,
+- organizational clues.
 
-Environment norm: the room runs against TryHackMe's **AttackBox** (a browser VM wired into their network; free tier ≈ 1–2 hrs/day, premium more) or your own Kali over the VPN — and the first three rooms of the module are free.
+### Active vs passive
 
-## 2. ACTIVE vs PASSIVE reconnaissance — the lecture's core
+| Type | Interaction | Example |
+|---|---|---|
+| Passive | Target infrastructure ko directly request nahi/low direct interaction | WHOIS, public search, Wayback, Shodan index |
+| Active | Target/DNS/service ko query/probe | DNS queries, ping, port scan |
 
-**The one-line test he drills:** *did you directly interact with the target or not?*
+Passive less noisy but not risk-free; data stale/inaccurate. Active requires authorization, rate limit and scope.
 
-- **PASSIVE** — *binoculars from afar, never stepping onto the territory:* only **publicly-available** information; the target sees nothing.
-  - **Public DNS/whois records** (already-covered rooms)
-  - **Job-ad OSINT (the gem of the session):** read the company's **naukri.com postings** — "cyber-security analyst must know X language / Y framework" leaks **their internal tech stack** and hiring profile without asking anyone
-  - **Company news/updates** and, in the quiz, the **Facebook page → employee names** (answer: PASSIVE)
-- **ACTIVE** — *checking the locks on the doors and windows:* any direct engagement; the target can see you (packets, logs).
-  - **Port scans** (requests hit the target), **ping/ICMP** ("it knows my packets are coming — logs get made")
-  - **Banner grabbing:** connect to FTP/HTTP/SMTP servers and read what the service announces
-  - **Social engineering** — even non-technical: the quiz's *meet the IT admin and sweet-talk network details* is ACTIVE (direct interaction of any kind counts)
-- Demo that lands the point: on the Metasploitable-2 VM (**192.168.47.138**), a bare `telnet`/`ftp` connect returns the **service banner — including version — with zero login**. That's exactly where nmap's version detection reads from; it only fails when admins bother to hide/fix the banner.
-- Legal-adjacent aside worth keeping: **companies do hire people to social-engineer their own staff** (posed as a new joiner) to expose human weak links — "humans are bundles of mistakes," and employees are where entry points live.
+---
 
-## 3. Toolset #1 — WHOIS
+## 2. WHOIS
 
-A **request/response protocol (RFC 3912)** — whois servers listen on **port 43**; registrars (GoDaddy, **Namecheap**) maintain the per-domain record. Fields to read: **registrar** (through whom bought), **registrant contact info** (usually **REDACTED — privacy services hide owner details**; his "unless privacy" caveat), **creation / updated / expiry dates**, **name servers**. Live: `whois tryhackme.com` on Kali.
+WHOIS/RDAP domain-registration information provide kar sakta hai:
 
-## 4. Toolset #2 — DNS pulling (dig / nslookup)
+- registrar,
+- creation/expiry dates,
+- nameservers,
+- registrant details if public/not privacy-protected.
 
-- Baseline queries show the domain's IPs etc., answered **via the configured gateway resolver**.
-- **Record-specific queries** — ask for **A** or **TXT** alone ("important intel hides in TXT records").
-- **Custom resolvers:** point the query at a chosen server — Google **8.8.8.8**, Cloudflare **1.1.1.1** (the demo flips the resolver and re-runs) — prelude to why controlled resolvers matter later.
-- Online equivalents give the same answers in a browser; the room's final **flag** is read off a record and submitted.
+Privacy services/redaction common. WHOIS email/phone historical/stale ho sakta; person identity proof nahi.
 
-## 5. Toolset #3 — dnsdumpster.com
+Defensive use:
 
-Free domain-intel web app: same concept, nicer presentation — a **zoomable host map** of the domain plus **PNG/XLS report exports**. Its subdomain-harvesting powers the room quiz: besides `www`/`blog`, which "interesting subdomain" exists for the target — options admin/testing/remote → **answer: `remote`** (admin fails when tried).
+```text
+domain -> registrar/date/nameservers -> asset ownership hypothesis
+```
 
-## 6. Toolset #4 — Shodan.io
+Use official RDAP/registrar sources where possible. Contact data copy/share minimize.
 
-The search engine for **internet-connected devices** (IoT cameras, exposed services): it shows **banners**, IPs, hosting providers, geolocation, ports—and crucially, **things you'd never get by directly touching the target** (a purely passive bonus). Room stats questions: second-top country by publicly-accessible devices (answer garbled in ASR); **third most-common port → 8080** (after 80 was rejected). Paid Shodan unlocks more — "barely matters at this stage."
+---
 
-## 7. Toolset #5+ — the overflow kit he name-drops
+## 3. DNS tools: `dig` and `nslookup`
 
-- **VirusTotal** → search a domain → **Relations** tab: **subdomains** (found *more* than dnsdumpster here) + **passive-DNS ↔ IP** mappings — directly ammunition for scope-testing in web hacking.
-- CLI enumerators mentioned for later: **amass**, **subfinder**.
-- Doctrine: **manual is best** — tools differ, the *concept* is one; google-dorking and friends sit in the same family.
+DNS hostname ko IP/services records se map karta hai.
 
-## 8. Toolset #6 — the Wayback Machine (archive.org)
+```bash
+dig example.test A
+dig example.test MX
+dig example.test NS
+dig example.test TXT
+nslookup example.test
+```
 
-The internet's time machine: pick a date, see the site's **past state** (Facebook of 2018-02-18 vs today — dramatically different UI). Recon value: **information/technologies that were on the site earlier and later removed** — "brother, you *used* to use this stack…" is a clue about what they still run.
+Records:
 
-## 9. Assignment & channel norms
+- A/AAAA: address,
+- MX: mail servers,
+- NS: authoritative nameservers,
+- CNAME: alias,
+- TXT: verification/policy text.
 
-Finish the recon rooms yourself, **share the completed room**, and — his recurring plea, now with the **3K-subscriber celebration** on top — leave feedback on Telegram/comments: *views are coming but responses aren't; typed reactions decide which series continues.*
+Subdomain discovery/zone transfer attempts active and authorization-sensitive. DNS data public hone par bhi no exploitation/no brute-force.
 
-## 10. Study pointers
+### 3.1 DNS troubleshooting
 
-1. Sort these into passive/active without notes: reading whois · pinging the target · digesting naukri.com ads · telnet-to-FTP banner · browsing archived pages · chatting up the IT admin. (Answers: P, A, P, A, P, A.)
-2. Hands-on: `whois <a real domain>` and find **all four**: registrar, dates, name servers, and the hidden-registrant privacy mask.
-3. Practice the DNS trio: default query, **TXT-record-only** query, and the same query forced through **1.1.1.1**.
-4. Same domain → run dnsdumpster + VirusTotal relations; diff the subdomain lists (his point: tools complement — manual/archival checks (Wayback) fill the gaps).
-5. Explain in one breath *why a banner grab is classified as active recon but reading Shodan's cached banner of the same host is passive.*
+Different resolvers/cache/TTL ki wajah se results vary:
+
+```bash
+dig @1.1.1.1 example.test
+```
+
+Public resolver use policy/organization rules ke according. Sensitive internal names public query services mein paste mat karo.
+
+---
+
+## 4. DNSDumpster
+
+Transcript DNSDumpster.com ko visual/public DNS discovery tool ke roop mein mention karta hai:
+
+- subdomains,
+- DNS records,
+- IP relationships,
+- host/network diagram.
+
+Results leads hain; ownership and freshness verify karo. Tool terms/rate limits follow. Organization ke authorized domain par asset inventory ke liye use; random third-party domain nahi.
+
+---
+
+## 5. Shodan
+
+Shodan internet-wide indexed service/banner data provide kar sakta hai. Search concepts:
+
+- domain/IP,
+- hostname,
+- port,
+- product/banner,
+- organization/location filters.
+
+Shodan result ka meaning:
+
+```text
+indexed observation at capture time
+```
+
+It is not permission, live proof or vulnerability proof. Banner old/false, IP reused, NAT/CDN/shared hosting ho sakta.
+
+Defensive workflow:
+
+1. Own authorized domain/IP range identify.
+2. Shodan result capture timestamp/source.
+3. Asset owner/port verify safely.
+4. Exposure remediate—patch, close port, auth, firewall.
+5. Recheck after change.
+
+Credentials or exposed service par login/test nahi.
+
+---
+
+## 6. Tool overflow: recon ecosystem
+
+Transcript additional tools/categories name-drops karta hai—search engines, subdomain/DNS tools, archive and public intelligence services. Tool list ya memorization se zyada methodology important:
+
+```text
+Question -> source/tool -> observation -> corroboration -> report
+```
+
+Different tools inconsistent output de sakte hain. Query/timezone/source note karo.
+
+---
+
+## 7. Wayback Machine
+
+`archive.org/web` historical web snapshots preserve kar sakta hai:
+
+- old pages,
+- retired contact pages,
+- previous JavaScript/assets,
+- historical subdomains/branding,
+- old public docs.
+
+Useful for defensive exposure review, but archive copy:
+
+- incomplete,
+- stale,
+- missing assets,
+- cached sensitive content
+ho sakti.
+
+Historical secret milne par use nahi; current owner/security contact ko report and rotate/revoke recommend.
+
+---
+
+## 8. Recon report template
+
+```markdown
+Target: authorized domain/IP
+Scope and authorization:
+Tool/source:
+Query/date/time:
+Observation:
+Freshness/limitations:
+Independent verification:
+Risk:
+Recommended remediation:
+```
+
+Recon report mein:
+
+- full personal contact data redact,
+- no passwords/tokens,
+- no exploit payload,
+- screenshots only necessary,
+- source links and timestamps.
+
+---
+
+## 9. Common mistakes aur safety points
+
+1. Passive result ko current truth samajhna.
+2. WHOIS privacy-redacted data ko infer/harass karna.
+3. DNS query ko authorization bypass samajhna.
+4. DNSDumpster result se every subdomain active assume.
+5. Shodan banner ko vulnerability proof.
+6. Shared/CDN IP ko organization ownership proof.
+7. Wayback old secret ko use karna.
+8. Active scan without scope.
+9. Public recon data se login/brute force.
+10. Source/timestamp/freshness record na karna.
+
+---
+
+## 10. Day 5 self-check questions
+
+1. Active aur passive reconnaissance compare karo.
+2. WHOIS/RDAP se kya data mil sakta hai aur limitation kya?
+3. `dig A/MX/NS/TXT` records ka role kya?
+4. DNSDumpster result ko verify kaise karoge?
+5. Shodan indexed banner ko authorization kyu nahi samjha ja sakta?
+6. Wayback defensive use-case do.
+7. Historical secret milne par proper response kya?
+8. Recon report mein timestamp/freshness kyu important?
+9. CDN/shared IP attribution risk kya hai?
+10. Passive reconnaissance kab active interaction ban sakta hai?
+
+---
+
+## 11. Continuity
+
+Day 5 ne external/public recon ka toolkit diya. Day 6 browser, ICMP/ping, traceroute, Telnet and Netcat se network path/service behavior manually observe karega.
