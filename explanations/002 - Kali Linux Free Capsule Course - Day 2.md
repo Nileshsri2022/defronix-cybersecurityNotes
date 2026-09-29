@@ -1,372 +1,498 @@
-# Explanation — Day 2: Linux File System Hierarchy & Basic Commands
+# Day 2 — Kali Linux Capsule Course: File System Hierarchy + Basic Commands (Hinglish Explanation)
 
-**Lecture:** 002 — Kali Linux Free Capsule Course, Day 2
-**Translation:** [`english/002 - Kali Linux Free Capsule Course - Day 2.md`](../english/002%20-%20Kali%20Linux%20Free%20Capsule%20Course%20-%20Day%202.md)
-**Builds on:** Day 1 (root partition `/`, OS-defined vs user-defined data, public vs private place)
+**Source transcript:** `transcripts/002 - Kali Linux Free Capsule Course - Day 2 [ Hindi ].hi-orig.srt`  
+**Note:** Ye explanation Hindi original transcript ko samajh kar likha gaya hai. Auto-captions mein `पढ़ा`/`फाइल`, `एब्सलूट पाठ`, `एम के दी यार`, `सीडी`, `एलएस`, `टच`, `कैट` jaise shabd garbled mile hain; unka intended technical meaning restore karke simple Hinglish mein explain kiya gaya hai.
 
 ---
 
-## 1. Kali desktop orientation
+## 1. Class start — Day 2 mein kya cover hoga?
 
-Before the theory, the trainer walks through the Kali GUI so you know where things live:
+Trainer pehle request karte hain ki agar content useful lag raha hai to course ko un logo tak forward karo jinko free cyber-security learning ki real need hai. Phir Day 2 ke 2 main parts clear karte hain:
 
-| Item | Windows equivalent |
+1. **Linux File System Hierarchy** — Day 1 mein bola gaya tha ki root partition `/` ke neeche around 17–19 default directories hoti hain. Aaj un directories ka role samjhenge.
+2. **Basic Linux Commands** — file/directory create, delete, copy, move, rename, type check, help/manual, path concepts.
+
+Day 1 ka base yaad rakho: Linux mein random jagah file banana problem create karta hai. Aaj hum samjhenge kaunsi directory kis purpose ke liye bani hai, phir commands seekh kar usi planning ke hisaab se kaam karenge.
+
+---
+
+## 2. Desktop aur terminal chhota sa tour
+
+Class practically Kali Linux machine par hoti hai. Trainer GUI mein batate hain:
+
+- Left/taskbar area mein applications hote hain; “all applications” mein security categories aur tools milte hain.
+- Default **text editor** aur **Firefox browser** jaise normal tools bhi installed hote hain.
+- Main kaam ke liye **terminal/shell** open kiya jata hai.
+
+Terminal ke useful features:
+
+- **New tab:** ek hi terminal window mein dusra shell tab khol sakte ho. Agar ek tab mein koi task chal raha hai, dusre tab mein parallel kaam kar sakte ho.
+- **Split:** terminal ko vertically/horizontally split kar sakte ho, taaki do shells side-by-side dikhen.
+
+---
+
+## 3. Root partition `/` aur `/root` ka difference — bahut important
+
+Yahan beginners ka common confusion clear hota hai:
+
+- **`/` (forward slash)** = root partition, parent folder/partition. Iske upar kuch nahi hai. Saara OS-defined aur user-defined data isi ke neeche aata hai.
+- **`/root`** = super user `root` ka home directory. Ye root user ka private place hai.
+
+Matlab dono ko log “root” bol dete hain, but dono same nahi hain. Day 1 wala point dobara yaad karo: around 17–19 default directories mein se sirf 2 user-home side hoti hain — `/root` root ke liye, `/home` normal users ke liye.
+
+Trainer ek aur important baat repeat karte hain: directories pehle se purpose ke hisaab se aur permissions/policies ke saath define hoti hain. Koi program download/install/execute kahan hoga, uski config files mein ye bataya hota hai. Aap technically chahe `/boot`, `/media`, `/mnt` ya kisi aur directory mein bhi file bana lo, lekin wo directory usi purpose ke liye nahi bani; permission/breakage issue aa sakta hai. Comfortable kaam ke liye Linux ke planning ko follow karo.
+
+---
+
+## 4. File System Hierarchy — `/` ke neeche ki main directories
+
+Trainer root partition par ja kar directories dikhate hain aur ek-ek ka role batate hain. Kuch captions garbled hain, lekin standard Linux hierarchy ke hisaab se intended meaning ye hai:
+
+### 4.1 `/bin` — user binaries/commands
+
+`/bin` mein binary executable files hoti hain — matlab commands/programs ki machine-runnable files.
+
+- Koi bhi command run karne ke liye uske instructions program form mein hote hain.
+- Program ko machine par chalane ke liye wo binary form (0/1) mein converted executable hota hai.
+- Isliye common commands ki program files yahan mil sakti hain. Trainer `/bin` ke andar list dikhate hain.
+
+Modern Kali/Debian systems mein `/bin` aksar `/usr/bin` ka symlink hota hai. Iska proof aage `ls -l /` mein arrows se bhi dikhaya jata hai.
+
+### 4.2 `/boot` — boot loader aur boot sequence files
+
+`/boot` mein booting se related cheezein hoti hain:
+
+- **boot loader program** (jaise GRUB related files)
+- kernel boot ke liye zaroori config/files
+- boot sequence/configuration
+
+Trainer boot sequence simple Hinglish mein samjhate hain: power button dabate hi current flow hota hai, machine boot start karti hai, POST/hardware checks hote hain, phir kernel aur hardware modules/drivers load hote hain, components sequence mein start hote hain. Linux/UNIX machine boot karte waqt black screen par lines chalti dikh sakti hain — wo sequence checks/services ko dikhati hain. `/boot` ke andar `config-<kernel-version>` jaise files aur boot loader configuration mil sakti hai.
+
+### 4.3 `/dev` — device files
+
+`/dev` = device files ki directory. Linux mein hardware aur software ke beech interface ka kaam device files karti hain.
+
+Important concept: **Linux mein har cheez file hoti hai** — hard disk, pen drive, terminal, audio device, etc. Hardware ka data do common tareeke se flow hota hai:
+
+- **Block form** — data chunks/blocks mein transfer hota hai (disk-type devices).
+- **Character form** — data character/stream ki tarah hota hai (mic/speaker jaise stream example diya gaya).
+
+`ls -l /dev` karne par first character se file type identify hota hai:
+
+| First char | Meaning |
 |---|---|
-| Applications list (taskbar menu) | Start menu / all apps |
-| "File System" file manager entry | This PC / My Computer |
-| Default text editor | Notepad |
-| Firefox | Browser |
-| **Terminal** | Command Prompt / PowerShell |
-
-Terminal productivity features shown:
-- **New Tab** — run a second shell while a long task occupies the first.
-- **Split (horizontal/vertical)** — two shells side by side on one screen.
-
----
-
-## 2. Reading the shell prompt
-
-A Kali prompt looks like:
-
-```
-┌──(root㉿kali)-[~]
-└─#
-```
-
-| Part | Meaning |
-|---|---|
-| `root` / `kali` | **Username** currently logged in |
-| after `㉿` | **Hostname** of the machine |
-| `[~]` or `[/etc]` | **Present working directory**; `~` = that user's home directory |
-| `#` | You are the **root / super user** |
-| `$` | You are a **normal user** |
-
-> Quick rule: **`#` = root, `$` = normal user.** This is the fastest way to know your privilege level at a glance.
-
----
-
-## 3. `/` vs `/root` — clearing the confusion
-
-Two different things are both casually called "root":
-
-| Path | Name | What it is |
-|---|---|---|
-| `/` | **Root partition** (parent partition) | Top of the entire hierarchy. Nothing exists above it. |
-| `/root` | **Root user's home directory** | The super user's *private place* — equivalent to `/home/<name>` for a normal user. |
-
----
-
-## 4. Why directory choice matters
-
-Common beginner objection: *"I can create my file in any directory and it works, so why do these rules matter?"*
-
-Answer given: **permissions.** Linux has pre-defined, policy-driven roles for each directory — where a program downloads to, where it installs, where it executes from, where its config lives. Work with that design and everything is comfortable; work against it and you hit permission problems. Purely mechanically you *can* create a file in `/boot`, `/media` or `/mnt` — but each directory was built for a purpose and should be used for that purpose.
-
----
-
-## 5. File System Hierarchy — directory by directory
-
-| Directory | Full name | Contents / purpose |
-|---|---|---|
-| **`/bin`** | binaries | Executable (binary) program files for **commands**. Every command has a program file — a set of instructions compiled into 0s and 1s. |
-| **`/boot`** | boot | Files needed to boot the machine, including the **GRUB boot loader** and kernel `config-*` files that define the boot sequence. |
-| **`/dev`** | devices | **Device files** — the interface between hardware and software. |
-| **`/etc`** | et cetera | System **configuration** and settings. |
-| **`/home`** | home | Home directories of **all normal users** — each user's private place. |
-| **`/lib`** | libraries | **Library files** required for applications to run (e.g. a web server's libraries). |
-| **`/lost+found`** | — | Fragments recovered after a crash / unclean shutdown. **Important for digital forensics.** |
-| **`/media`** | media | Auto-mount point for **removable media** (CD/DVD, USB). |
-| **`/mnt`** | mount | Manual **mount point** — ISO images, pen drives, hard disks. Normally empty. |
-| **`/opt`** | optional | **Third-party / optional software.** |
-| **`/proc`** | process | Live, kernel-updated **process information**. Commands like `top` read from here. |
-| **`/root`** | root | **Super user's home directory** (Desktop, Documents, Downloads, Music...). |
-| **`/sbin`** | system binaries | Binaries for commands **only the super user can run**. |
-| **`/srv`** | serve | Data served by services (FTP, NFS, proxy, web) — including cached/temporary data for faster response, *cache-like* in intent. |
-| **`/sys`** | system | **Kernel and hardware** details: block devices, buses, classes, firmware, kernel modules (drivers). |
-| **`/tmp`** | temporary | Scratch space writable by everyone — protected by the **sticky bit**. |
-| **`/usr`** | user | Binaries, libraries and **documentation** for user programs. |
-| **`/var`** | variable | Files that **change over time**: logs, caches, mail spools, web content (`/var/www`). |
-| **`/run`** | run | Runtime state data. |
-
-### 5.1 Device file types (from `ls -l`)
-
-The first character of the permission string tells you the file type:
-
-| Char | Type |
-|---|---|
-| `-` | regular file |
 | `d` | directory |
-| `c` | character device |
-| `b` | block device |
-| `s` | socket |
-| `l` | symbolic link |
+| `c` | character device/file |
+| `b` | block device/file |
+| `s` | socket file |
+| `l` | symlink/link |
 
-**Block vs character transfer:**
-- **Block** — data moves in fixed-size chunks/blocks (disks).
-- **Character** — data streams character by character (mic → speaker, terminals).
+Isliye `/dev` mein hardware-related interface files milti hain; inhe normal text files ki tarah samajh kar edit nahi karna chahiye.
 
-> Core Linux principle stated in class: **everything is a file** — hard disk, pen drive, device, socket.
+### 4.4 `/etc` — system configuration/settings
 
-### 5.2 The boot sequence (from `/boot`)
+`/etc` mein system settings aur configuration files hoti hain. Services, programs aur system behaviour ke config yahan milte hain. Trainer ke “system ki jo settings hoti hain wo yahan milti hain” line ka intended meaning `/etc` hai.
 
-1. Power button pressed → current flows.
-2. **POST** (power-on self test) — hardware components checked.
-3. **BIOS**.
-4. **Kernel** loads.
-5. **Hardware modules / drivers** load alongside the kernel.
+Baad mein jab aap web server, SSH, users, networking ya services configure karoge, to `/etc` ke andar ki config files bahut important hoti hain.
 
-The scrolling black-screen text at startup is this sequence. Which step runs when is defined by the configuration files in `/boot`, and GRUB is the boot loader that drives it.
+### 4.5 `/home` — normal users ka private area
 
-### 5.3 What "mount" means (`/mnt`, `/media`)
+`/home` ke andar sab normal users ke home directories hote hain. Agar machine par sirf ek normal user `kali` hai, to `/home/kali` dikhega. Agar 2, 5, 10 users banaye, sab `/home` ke andar apne-apne folders mein milenge.
 
-**Mounting** attaches a storage device into the directory tree so data can flow to/from it. Until a device is mounted, you cannot use it.
+Day 1 ke public/private concept se link: `/home/<username>` normal user ka private place hai.
 
-**Analogy used in class:** a room with no door or window — you cannot enter or use it. Mounting is installing the door.
+### 4.6 `/lib` aur `/lib64` — library files
 
-### 5.4 The sticky bit (`/tmp`)
+`/lib` mein shared library files hoti hain jo applications/commands ko run hone ke liye chahiye. Example: web server run ho raha hai to uski required libraries aur uske related modules ki files system library locations mein hoti hain.
 
-`/tmp` is world-writable, but a **sticky bit** is set on it so that **only the user who created a file can delete that file** (root excepted). Without it, any user could wipe another user's temp files.
+Modern systems mein bhi `/lib` aur `/lib64` kai baar `/usr/lib` / `/usr/lib64` ke symlink hote hain. Ye symlink concept aage `ls -l` mein dikhaya jata hai.
 
-### 5.5 Symbolic links at `/`
+### 4.7 `lost+found` — crash ke baad recovered fragments
 
-Several entries directly under `/` — `bin`, `sbin`, `lib`, `lib32`, `lib64` — are not real directories. They are **symbolic links (symlinks)** pointing to their real counterparts inside `/usr`. Conceptually similar to a Windows shortcut. `/media`, `/home`, `/boot` etc. are genuine directories.
+`lost+found` ext filesystems par milta hai. Jab system sudden off ho jata hai, battery khatam ho jati hai, ya machine crash ho jati hai, to running programs/files properly close nahi hote. Filesystem check/recovery ke waqt kuch recovered fragments `lost+found` mein aa sakte hain.
 
-### 5.6 Columns of `ls -l`
+Trainer isko digital forensics se jodte hain: agar system crash hua aur pata karna hai ki kaunsi process/file ki wajah se problem aayi, to kabhi-kabhi useful fragments/recovered information yahan mil sakti hai. Guarantee nahi hoti, lekin forensics ke time ye directory interesting ho sakti hai.
 
-```
--rw-r--r--  1  root  root  4096  Sep 28 15:58  file.txt
-   │        │   │     │      │        │            │
-permissions │  user group  size  timestamp      name
-         link count
-```
+### 4.8 `/media` — removable media auto-mount point
+
+`/media` removable media se related hai — CD/DVD drive, USB/pen drive jaise media auto-mount hone par yahan entry aa sakti hai. Aaj kal CD drive rare hai, but concept same hai: removable media ko access karne ke liye use mount hona zaroori hai.
+
+### 4.9 `/mnt` — manual mount point
+
+`/mnt` = mount. Jab aap khud kisi ISO image, pen drive, extra hard disk ya local repository ko manually mount karte ho, to traditionally `/mnt` use hota hai.
+
+Mount ka meaning trainer analogy se samjhate hain: ek kamra hai, agar usme darwaza hi nahi hai, to andar kaise jaoge? Waahi tarah storage device ko mount karna matlab us tak pahunchne ka rasta banana. Jab tak device mount nahi hota, uske andar data flow/access nahi hota.
+
+Example use cases transcript style mein:
+
+- ISO image mount karna
+- local repository configure karna
+- corrupt program/kernel recovery ke liye media attach karna
+- pen drive/hard disk insert kar ke use `/mnt` ke neeche mount karna
+
+### 4.10 `/opt` — optional/third-party software
+
+`/opt` optional software ke liye hota hai. Third-party tools/packages ko yahan install kar sakte ho. Kali mein kai security tools separately `/opt` mein bhi mil sakte hain.
+
+### 4.11 `/proc` — live process/kernel information
+
+Trainer jab “ye program directory directly kernel se update hoti hai” bolte hain, intended directory `/proc` hai. `/proc` ek virtual filesystem hai jisme running processes aur kernel-related live information hoti hai.
+
+- Processes ki real-time state yahi se milti hai.
+- `top`, `ps`, process status jaise commands background mein `/proc` ka reference lekar output dikhate hain.
+
+Ye normal storage directory nahi hai; yahan ki files kernel/runtime information ko represent karti hain.
+
+### 4.12 `/root` — root user ka home
+
+`/root` super user ka home directory hai. Trainer andar ja kar dikhate hain: Desktop, Documents, Downloads, Music etc. — normal user ke home jaise hi structure, lekin ye root ka private place hai.
+
+### 4.13 `/sbin` — superuser binaries
+
+`/sbin` mein bhi binary files hoti hain, lekin ye wahi commands/programs hote hain jinhe generally **root/superuser** run kar sakta hai. Normal user ke daily commands `/bin`, administration/system commands `/sbin` side hote hain. Modern systems mein `/sbin` bhi `/usr/sbin` ka symlink ho sakta hai.
+
+### 4.14 `/srv` — service/served data
+
+`/srv` ko trainer serving directory ki tarah explain karte hain. Agar FTP, NFS, proxy ya koi server/service configure ki hai, to users ko serve karna ya temporarily hold karna wala data service ke purpose ke hisaab se yahan rakh sakte ho. Idea: jaise cache memory speed badhati hai, waise service data organized rakha jata hai taaki service fast response de.
+
+### 4.15 `/sys` — kernel/hardware subsystem info
+
+`/sys` bhi virtual filesystem hai jisme kernel aur hardware se related information hoti hai. Trainer andar ja kar entries dikhate hain jaise:
+
+- `block` — block devices
+- `bus` — data lanes/buses related
+- `class` — device classes
+- `firmware`
+- kernel modules/drivers related information
+
+Purpose: basic pata hona chahiye ki kernel/hardware details kahan milti hain. One-day mein pura deep dive nahi; use karte-karte familiarity aati hai.
+
+### 4.16 `/tmp` — temporary directory with sticky bit
+
+`/tmp` temporary directory hai. Har user yahan apna temporary kaam kar sakta hai. Lekin important rule: jis user ne file create ki, wahi us file ko delete kar sakta hai; dusra normal user us file ko delete nahi kar sakta. Root alag baat hai.
+
+Reason: `/tmp` par **sticky bit** set hota hai. Isliye shared temporary space hone ke baawajood users ek dusre ki files delete nahi kar paate.
+
+Example: `kali` user ne `/tmp` mein file banayi; baad mein `sachin` user aakar sab users ki files delete nahi kar sakta. Files temporary nature ki hoti hain aur cleanup ho sakta hai.
+
+### 4.17 `/usr` — user system resources
+
+`/usr` ke andar binary files, library files, documentation, local data jaise resources milte hain. Trainer batate hain ki asli files aksar `/usr` ke neeche hoti hain aur root-level `/bin`, `/lib`, etc. unke shortcuts/symlinks ho sakte hain.
+
+Modern layout example:
+
+- `/bin` → `/usr/bin`
+- `/sbin` → `/usr/sbin`
+- `/lib` → `/usr/lib`
+- `/lib64` → `/usr/lib64`
+
+Isliye same binary root par bhi dikhti hai kyunki symlink root partition ke neeche rakh hota hai.
+
+### 4.18 `/var` — variable files
+
+`/var` mein wo files hoti hain jo time-to-time change hoti rehti hain — variable data. Examples transcript style: mail files, cache, logs, spool type data. Web server ki files bhi usually `/var/www` ke under milti hain.
+
+Short rule: `/etc` config, `/var` changing operational data/logs.
 
 ---
 
-## 6. Commands taught
+## 5. Symlink aur `ls -l /` ka output
 
-### 6.1 Navigation
+Trainer `ls -l /` jaisa output dikhate hain. Usme aapko columns milte hain:
 
-| Command | Meaning |
-|---|---|
-| `cd <dir>` | **Change directory.** Only directories can be given, not files. |
-| `cd /` | Go to the root partition |
-| `cd ~` | Go to your home directory |
-| `cd -` | Go back to the **previous** directory you were in |
-| `cd ..` | Go up one level (parent) |
-| `pwd` | **Print/present working directory** — shows the full path |
-
-> On older UNIX/Red Hat prompts the prompt shows only the current directory name, not the full path — `pwd` is how you get the full path reliably.
-
-### 6.2 Absolute vs relative path
-
-| Type | Starts with | Works from | Example |
-|---|---|---|---|
-| **Absolute** | `/` | **Anywhere** | `cd /root/Downloads` |
-| **Relative** | a name | Only relative to your **current** directory | `cd Downloads` |
-
-Demonstrated failure: sitting at `/`, `cd Downloads` fails; `cd /root/Downloads` works. **Advice: prefer absolute paths**, especially with destructive commands.
-
-### 6.3 `.` and `..`
-
-| Entry | Stores the address of |
-|---|---|
-| `.` (single dot) | the **current** directory |
-| `..` (double dot) | the **parent** directory |
-
-Both are hidden entries — visible only with `ls -a`.
-
-### 6.4 `ls` — listing
-
-| Form | Effect |
-|---|---|
-| `ls` | List the present working directory |
-| `ls /etc` | List a specific directory |
-| `ls -a` | Include **hidden** files (and `.` / `..`) |
-| `ls -l` | **Long format** — metadata: permissions, links, user, group, size, timestamp, name |
-| `ls -al` | Both combined |
-| `ls -d` | Directories only |
-| `ls -h` | Human-readable sizes |
-
-### 6.5 Getting help
-
-| Command | Use |
-|---|---|
-| `<command> --help` | Quick summary: syntax, available flags |
-| `man <command>` | The full **manual page** — "a whole book" with detailed information |
-
-> This is the real skill: you don't need to memorise flags, you need to know the command name and how to read its help.
-
-### 6.6 Tab auto-completion
-
-Type a prefix and press **Tab**:
-- Unique match → the name is **auto-completed**.
-- Multiple matches → all candidates are listed (`Desktop`, `Documents`, `Downloads`), so you type one more character and press Tab again.
-
-Remember: **Linux is case-sensitive** — `doc` ≠ `Doc`.
-
-### 6.7 Creating directories
-
-```bash
-mkdir capsule-course              # in current directory
-mkdir /tmp/unix                   # anywhere, via absolute path
-mkdir -p /tmp/unix1/tom           # -p creates the whole parent→child chain
+```text
+permissions  links  user  group  size  timestamp  name
 ```
 
-`-p` maintains the **parent–child relationship**: it creates each missing level instead of failing.
+Aur kuch entries mein arrow hota hai:
 
-### 6.8 Removing directories and files
-
-| Command | Behaviour |
-|---|---|
-| `rmdir <dir>` | Deletes a directory **only if it is empty**; otherwise fails |
-| `rm <file>` | Delete a file |
-| `rm -r <dir>` | **Recursive** — delete a directory and everything in it |
-| `rm -f` | **Force**, no prompts |
-| `rm -i` | **Interactive** — prompt before each deletion |
-| `rm -d` | Remove an empty directory |
-
-#### ⚠ The `rm -rf` warning
-
-The trainer's strongest safety advice of the session:
-
-> **`rm -rf` is a very powerful and dangerous command. If you are not comfortable with it, do not use it.**
-
-**Why it destroys systems:** the shell splits your line on **spaces** into arguments. A stray space turns one path into two:
-
-```bash
-rm -rf /tmp/unix      # deletes /tmp/unix
-rm -rf / tmp/unix     # ← accidental space: first argument is  /
+```text
+bin -> usr/bin
+lib -> usr/lib
+lib64 -> usr/lib64
+vmlinuz -> boot/vmlinuz-...
+initrd.img -> boot/initrd.img-...
 ```
 
-The first argument is now `/` — the entire root partition — and `rm` will happily start deleting the whole file system. Mitigations: use absolute paths deliberately, use `-i` while learning, and re-read the line before pressing Enter.
-
-### 6.9 `touch` — and the three timestamps
-
-`touch file` does create an empty file, and can create several at once:
-
-```bash
-touch linux1 linux2 linux3
-```
-
-**But that is not its main purpose.** `touch`'s primary job is to **update timestamps**. Every file carries three:
-
-| Timestamp | Meaning | Changed by |
-|---|---|---|
-| **Access time (atime)** | when the file was last read/opened | `touch -a` |
-| **Modify time (mtime)** | when the file's **content** was last edited | `touch -m` |
-| **Change time (ctime)** | when the file's **metadata** last changed (permissions, location, size, name) | **cannot be set directly** — updates automatically whenever atime or mtime changes |
-
-Inspect them with:
-
-```bash
-stat file1        # shows Access, Modify, Change and Birth times
-```
-
-Demonstrated:
-- `touch file1` → all timestamps jump to now.
-- `touch -a file2` → only access time (and consequently change time) updates; modify time untouched.
-- `touch -m file3` → modify time (and change time) update; access time untouched.
-
-### 6.10 `cat` — create, read, concatenate
-
-```bash
-cat > newfile.txt      # create and type content; Ctrl+D to finish
-cat newfile.txt        # read the content
-cat file1 file2 > merged.txt   # concatenate two files into one
-```
-
-`>` is the **redirection symbol** — it sends output into a file instead of the screen. The name `cat` comes from **concatenate**.
-
-### 6.11 `cp` — copy
-
-```bash
-cp file3.txt /tmp/                 # copy a file
-cp -r /source/dir /destination/    # -r = recursive, copies a directory and its contents
-```
-
-Syntax is always `cp <source> <destination>`. Advice repeated: give absolute paths.
-
-### 6.12 `mv` — move **and** rename
-
-```bash
-mv file3.txt newfile3.txt       # rename (same directory)
-mv newfile.txt /tmp/            # move to another directory
-mv newfile.txt /tmp/other.txt   # move and rename in one step
-```
-
-One command does both jobs — renaming is just "moving" to a new name in the same place.
-
-### 6.13 `file` — identify file type
-
-```bash
-file image.jpg     # -> JPEG image data
-file /bin/ls       # -> ELF 64-bit executable
-```
-
-Tells you the *actual* type regardless of the extension. Very useful in security work, where extensions lie.
+Iska matlab ye entries hard/direct copy nahi, balki links hain. Link/hard link ke detail next classes mein aayenge; abhi ke liye bas itna samjho: root par dikhne wali kuch entries actual location ka shortcut hain.
 
 ---
 
-## 7. Command quick-reference
+## 6. Navigation commands — `cd`, `pwd`, `ls`, absolute vs relative path
+
+### 6.1 `cd` — change directory
+
+`cd` sirf directory ke andar jaane ke liye hota hai; file ka naam nahi dete.
 
 ```bash
-# Navigation
-pwd                      # where am I
-cd /path                 # absolute
-cd dir                   # relative
-cd ~ / cd / / cd - / cd ..
+cd /dev
+cd /home
+```
 
-# Listing
-ls                       # current dir
-ls -l                    # long / metadata
-ls -a                    # hidden included
-ls -al /etc              # both, on a given path
+Windows GUI mein folder par double-click karke andar jaate ho; Linux CLI mein `cd` se jaate ho.
 
-# Directories
-mkdir name
-mkdir -p a/b/c
-rmdir name               # empty only
-rm -r name               # recursive
+### 6.2 `pwd` — present working directory
 
-# Files
-touch f1 f2 f3
-stat f1                  # three timestamps
-touch -a f1 / touch -m f1
-cat > f1                 # create+write, Ctrl+D
-cat f1                   # read
-cat f1 f2 > f3           # concatenate
-cp src dst / cp -r src dst
-mv src dst               # move or rename
-rm -i f1                 # safe delete
-file f1                  # type
+`pwd` batata hai aap current mein kahan ho.
 
-# Help
+```bash
+pwd
+# output example: /root/Downloads
+```
+
+New/latest Kali prompt full path dikhata hai, lekin purani UNIX-style systems ya minimal setups sirf current folder dikh sakte hain; isliye `pwd` important hai.
+
+### 6.3 Absolute path vs Relative path
+
+**Absolute path** root `/` se start hota hai. Isse aap kisi bhi current location se target tak pahunch sakte ho.
+
+```bash
+cd /root/Downloads
+cd /tmp
+```
+
+**Relative path** current directory ke relative hota hai.
+
+```bash
+cd Downloads     # tabhi chalega jab Downloads current ke andar ho
+```
+
+Trainer example: aap `/root` home mein ho; `cd Downloads` chal jayega kyunki `Downloads` current ke neeche hai. Agar aap aur jagah ho aur seedha `cd Downloads` doge to error dega; wahan absolute path dena safe hai.
+
+### 6.4 Useful `cd` shortcuts
+
+```bash
+cd /      # root partition par jao
+cd ~      # apni home directory mein jao
+cd -      # previous directory par wapas jao
+```
+
+`.` aur `..`:
+
+| Symbol | Meaning |
+|---|---|
+| `.` | current directory ka address hold karta hai |
+| `..` | parent/previous directory ka address hold karta hai |
+
+Ye entries hidden hoti hain; `ls -a` se dikhti hain.
+
+### 6.5 `ls` — list files/directories
+
+Basic:
+
+```bash
+ls
+ls /etc
+ls -a
+ls -l
+ls -la
+```
+
+- `ls` current directory list karta hai, ya path dene par us directory ko.
+- `-a` hidden files including `.` aur `..` dikhata hai (captions mein `-A` bhi bola gaya; dono ka use hidden listing context mein hota hai, `-A` `.`/`..` ko usually skip karta hai).
+- `-l` long listing detail deta hai: permissions, links, user, group, size, timestamp, name.
+- flags combine ho sakte hain: `ls -la`.
+
+### 6.6 Help aur manual
+
+Command ka use nahi aata to help/manual dekho:
+
+```bash
 ls --help
 man ls
 ```
 
----
+`--help` short usage/options deta hai. `man` manual page hai — detailed reference; usme scroll karke padh sakte ho. Linux ki beauty yehi hai: command yaad ho to details help/manual se recover ho jati hain.
 
-## 8. Self-check questions
+### 6.7 Tab-completion — typing shortcut
 
-1. What do `#` and `$` in the prompt tell you?
-2. Differentiate `/` and `/root`.
-3. Which directory holds: command binaries, super-user-only binaries, configuration, logs, device files, kernel/hardware info, third-party software, recovered crash fragments?
-4. What are block and character devices? Which letters identify them in `ls -l`?
-5. Explain the boot sequence and the role of GRUB.
-6. What does mounting mean, and why is `/mnt` usually empty?
-7. What is the sticky bit and which directory demonstrates it?
-8. Why are `/bin` and `/lib` symbolic links on a modern Kali install?
-9. Absolute vs relative path — give an example of each and say when relative fails.
-10. What do `.` and `..` store, and why don't you normally see them?
-11. Name the three timestamps on a Linux file. Which one can `touch` not set directly, and why?
-12. Why is `rm -rf` dangerous? Reconstruct the stray-space failure.
-13. What does `-p` do for `mkdir`, and `-r` for `cp` and `rm`?
-14. Two ways to get documentation for an unfamiliar command.
-15. Why can't `rmdir` remove `/tmp/unix1` when it contains `tom`?
+Agar `D` type kar ke `TAB` dabate ho, shell matching names dikhata hai — Desktop, Documents, Downloads. Agar `Do` ke baad `TAB` dabao, to unique match `Documents` complete ho sakta hai.
+
+Points:
+
+- Poora naam baar-baar type karne ki zaroorat nahi.
+- Linux **case-sensitive** hai; spelling/case galat hua to completion/execute nahi hoga.
+- Cyber-security/Linux speed ke liye tab completion must-have habit hai.
 
 ---
 
-## 9. Coming up next
+## 7. Directory create/remove — `mkdir`, `rmdir`, `rm -r`
 
-Continuation of command-line work, building toward file permissions and users — the areas that make the "public place vs private place" model from Day 1 fully concrete.
+### 7.1 `mkdir` — directory create
+
+```bash
+mkdir capsule_course
+mkdir /tmp/unix
+```
+
+Absolute path dene se aap current location se bahar bhi directory bana sakte ho. Trainer sit-na-wise dikhate hain: pehle `cd /tmp` karne ki zaroorat nahi; direct `mkdir /tmp/unix` kar sakte ho.
+
+Parent-child chain banana:
+
+```bash
+mkdir -p /tmp/unix1/linux/commands
+```
+
+`-p` matlab parents: agar `/tmp/unix1` ya `/tmp/unix1/linux` nahi hai, to pehle bana do, phir final `commands` bana do.
+
+### 7.2 `rmdir` — sirf empty directory remove
+
+```bash
+rmdir capsule_course
+```
+
+Agar directory empty nahi hai, `rmdir` fail karega: “Directory not empty”.
+
+### 7.3 Non-empty directory remove — `rm -r`, safety warning
+
+```bash
+rm -r /tmp/unix1
+```
+
+`-r` recursive hai — starting se last tak andar ki files/subdirectories bhi delete karega.
+
+Trainer strong advice dete hain: `rm -rf` bahut powerful aur dangerous hai. Beginner ho to jab tak confidently hands-on na ho jao, use mat karo. Ek space/path mistake system uda sakta hai. Example danger: path likhte waqt extra space aa jaye aur command arguments ko alag-alag samajh le; galat jagah recursive delete chala de. Force options se bachna aur pehle path verify karna safe practice hai.
+
+---
+
+## 8. File create/timestamps — `touch`, `stat`
+
+### 8.1 `touch` ka main purpose
+
+Kaafi log `touch` ko sirf empty file create karne ke liye samajhte hain, lekin transcript mein trainer clarify karte hain: **`touch` ka main purpose timestamp update karna hai.** Empty file create hona side-effect ho sakta hai, but editing/file creation ke liye `nano`, editors, ya `cat > file` jaise tareeke bhi hain.
+
+Har file ke saath timestamps judte hain:
+
+| Timestamp | Meaning in easy Hinglish |
+|---|---|
+| **Access time (atime)** | file ko last kab open/access kiya gaya |
+| **Modify time (mtime)** | file ke content/data ko last kab edit/modify kiya gaya |
+| **Change time (ctime)** | file ka metadata last kab change hua — permissions, location, name, inode info etc. |
+| **Birth time** | file kab create hui (support filesystem/tool par depend karta hai) |
+
+Inhe dekhne ke liye:
+
+```bash
+stat file.txt
+```
+
+`stat` access/modify/change/birth jaise times dikhata hai.
+
+### 8.2 `touch` ke flags
+
+```bash
+touch file1 file2 file3     # multiple files create/update
+touch file1                 # access+modify time update (ctime bhi change ho sakta hai)
+touch -a file2              # sirf access time update
+touch -m file3              # sirf modify time update
+```
+
+Important: `change time (ctime)` ko `touch` seedha set nahi karta; jab access/modify/metadata kuch bhi change hota hai to ctime apne aap update ho jata hai.
+
+---
+
+## 9. `cat` — content read, combine, aur file create
+
+`cat` ka matlab **concatenate**. Ye mainly content read karne/jodne ke liye hota hai, but redirection ke saath file create/edit bhi kar sakta hai.
+
+### 9.1 File create + likhna
+
+```bash
+cat > newfile.txt
+```
+
+Ab jo type karoge wo file mein jayega. End karne ke liye:
+
+```text
+Ctrl + D
+```
+
+### 9.2 Content read
+
+```bash
+cat newfile.txt
+```
+
+### 9.3 Do files ka data combine karna
+
+```bash
+cat file1.txt file2.txt > combined.txt
+```
+
+Trainer style mein: pehli file ka content + dusri file ka content ek nayi/destination file mein likh diya jata hai.
+
+---
+
+## 10. File remove — `rm`
+
+Files remove karne ke liye:
+
+```bash
+rm file1.txt
+rm /tmp/file3.txt
+```
+
+Path absolute ya relative de sakte ho.
+
+Common flags discussed:
+
+```bash
+rm -f file        # forcefully remove, confirmation kam
+rm -i file        # interactive — har delete se pehle poochhe
+rm -r dir         # recursive — directory tree delete
+rm -d emptydir    # empty directory remove
+```
+
+Beginner ke liye `rm -i` useful hai, kyunki delete se pehle confirm karne ka mauka deta hai — galti se delete hone se bachata hai.
+
+---
+
+## 11. Copy aur Move — `cp`, `mv`
+
+### 11.1 `cp` — copy
+
+```bash
+cp /root/file3.txt /tmp/
+cp -r /tmp/unix1 /backup/
+```
+
+Tips: jab confusion ho to absolute path use karo. Directory copy karne ke liye recursive `-r` lagana padta hai.
+
+### 11.2 `mv` — move ya rename
+
+Same command move aur rename dono karti hai:
+
+```bash
+mv file3.txt newfile.txt          # same location mein rename
+mv newfile.txt /tmp/renamed.txt   # /tmp mein move + new name
+```
+
+Matlab destination path ke hisaab se `mv` decide karta hai: same dir new name = rename; dusri directory = move; dusri directory + new name = move with rename.
+
+---
+
+## 12. File type check — `file`
+
+Kabhi extension dekh kar samajh nahi aata file actual mein kya hai. `file` command type batati hai:
+
+```bash
+file image.jpg
+file suspicious
+file unknown
+```
+
+Security work mein useful hai, kyunki attacker ya user extension badal sakta hai; `file` content/magic bytes ke base par better idea deta hai.
+
+---
+
+## 13. Day 2 final takeaway
+
+1. `/` root partition hai; `/root` root user ka home hai — dono alag.
+2. `/` ke neeche ki default directories ka predefined purpose hota hai; unko randomly personal dumping ground mat banao.
+3. `/bin`, `/sbin` binaries; `/lib` libraries; `/etc` config; `/var` changing logs/cache/mail; `/tmp` temporary shared + sticky bit; `/dev` hardware interface; `/proc` `/sys` live kernel/hardware/process info; `/root` aur `/home` private user areas.
+4. `/media` removable media auto-mount, `/mnt` manual mount ke liye.
+5. Modern systems mein root-level kuch directories `/usr` ke symlinks hoti hain; `ls -l` mein arrow se pehchano.
+6. `cd`, `pwd`, `ls`, `mkdir`, `rmdir`, `touch`, `stat`, `cat`, `rm`, `cp`, `mv`, `file` Day 2 ke working commands hain.
+7. Sabse bada safety lesson: destructive commands — especially recursive/force remove — se pehle path double-check karo. Absolute path, tab completion, `--help`, aur `man` tumhe fast + safe banate hain.
+
+Trainer end mein bolte hain: agla session isi command line ko continue karega. Aaj ka goal tha ki file-system hierarchy aur basic CRUD/navigation commands clear ho jayein.

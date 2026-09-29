@@ -1,386 +1,423 @@
-# Explanation — Day 4: File Descriptors Deep Dive & Text-Processing Commands
+# Day 4 — Kali Linux Capsule Course: File Descriptor Recap + head/tail/less/tac/wc + `sed` Basics (Hinglish Explanation)
 
-**Lecture:** 004 — Kali Linux Free Capsule Course, Day 4
-**Translation:** [`english/004 - Kali Linux Free Capsule Course - Day 4.md`](../english/004%20-%20Kali%20Linux%20Free%20Capsule%20Course%20-%20Day%204.md)
-**Builds on:** Day 3 (I/O redirection, stdin/stdout/stderr)
-
----
-
-## Part 1 — File descriptors, properly explained
-
-Day 3 introduced descriptors 0/1/2. Day 4 opens with a deliberate 15-minute recap explaining **why they exist at all**.
-
-### 1.1 The chain: command → program → process → open files
-
-1. Every command you type (`wc`, `w`, `cd`, `ls`…) is a **program** — an executable binary living in `/bin` (covered on Day 2).
-2. Running that program **creates a process**.
-3. That process internally uses many **libraries** and files.
-4. **In Linux everything is a file** — so all those libraries count as files, held in the **open** state.
-
-### 1.2 Why the kernel must track open files
-
-> **Until the kernel can monitor something, it cannot control it.**
-
-The kernel is the most powerful component of the OS and is responsible for managing everything. An entity that manages everything but has no visibility into what is happening inside its own system is in the worst possible position. So the kernel needs a mechanism to **track every open file** — and that mechanism is the **file descriptor**.
-
-*(Analogy used in class: a head of household needs to know who is coming in, who is going out, and what everyone is doing.)*
-
-### 1.3 The three kernel tables
-
-| Table | What it holds |
-|---|---|
-| **File descriptor table** | Per-process. Maps small integers (0, 1, 2, …) to entries in the global file table. **Hidden** — only the kernel may update it. |
-| **Global file table** | System-wide. Holds the reference/address pointing onward to the inode table. |
-| **Inode table** | Holds each file's **metadata**: size, timestamps, location, plus a reference to where the file physically lives on the file system. |
-
-**The lookup chain:**
-
-```
-process
-   │
-   ▼
-file descriptor (a positive integer)
-   │   ← per-process, hidden, kernel-only
-   ▼
-global file table entry
-   │   ← system-wide
-   ▼
-inode  →  metadata (size, timestamps, permissions, location)
-   │
-   ▼
-actual file on the file system
-```
-
-> **Critical point:** a process **cannot** modify its own file descriptor table. Any change must go through the kernel. This is a security boundary, not an inconvenience.
-
-### 1.4 What a file descriptor gives a program
-
-1. **Where the file is stored** on the file system — the address to access it from.
-2. **Whether the process may access it** — the specific permissions.
-
-### 1.5 The inode number
-
-Every file — default or user-created, empty or full — is assigned a **unique inode number**. That number, not the filename, is how the system actually identifies the file.
-
-### 1.6 Recommended further reading
-
-The trainer is explicit that this is a surface-level treatment. To go deeper, study **Operating System Architecture**: how processes are created and scheduled, how they are loaded into RAM, how the CPU schedules them.
-
-### 1.7 Tying back to redirection
-
-By default:
-
-| Stream | Descriptor | Default device |
-|---|---|---|
-| stdin | 0 | **keyboard** |
-| stdout | 1 | **screen** |
-| stderr | 2 | **screen** |
-
-**Redirection is simply pointing a descriptor somewhere else** — feed a file into stdin instead of the keyboard; send stdout/stderr into a file instead of the screen. That is the entirety of Day 3's topic, now explained from the kernel's side.
+**Source transcript:** `transcripts/004 - Kali Linux Free Capsule Course - Day 4 [ Hindi ].hi-orig.srt`  
+**Note:** Ye explanation Hindi original transcript ko samajh kar banaya gaya hai. Auto-captions mein `रीकैप`, `आई नोट टेबल`, `सब्सीट्यूट`, `लेटर`, `वर्क/ब्लू सी`, `ली कमांड` jaise garbled words mile; intended meaning **recap**, **inode table**, **substitute**, **less**, aur **wc** liya gaya hai.
 
 ---
 
-## Part 2 — Viewing file contents
+## 1. Day 4 ka flow — pehle recap, phir text-view commands, phir `sed`
 
-The problem with `cat`: it dumps the **whole file** at once. For a thousand-line file that is unusable.
+Trainer start mein kehte hain ki Day 3 ka **file descriptor** concept naya tha aur kuch students ko clear nahi hua hoga. Isliye Day 4 ke first 10–15 minute quick recap hoga, phir commands continue hongi.
 
-### 2.1 `head` — from the top
+Day 4 ke 3 major parts:
 
-```bash
-head /etc/passwd          # first 10 lines (default)
-head -5 /etc/passwd       # first 5 lines
-head -15 /etc/passwd      # first 15 lines
-command | head -15        # works on piped output too
+1. **File descriptor recap** — process, inode table, global file table, file descriptor table aur stdin/stdout/stderr ka connection.
+2. **Text output dekhne ki commands** — `head`, `tail`, `less`, `more`, `tac`, `wc`.
+3. **`sed` command ka intro** — stream editor, line-number based printing aur substitution/search-replace.
+
+Trainer bolte hain: pahle concepts clear karo, phir Day 3 ke redirection practical dobara karo; uske baad doubt nahi aayega.
+
+---
+
+## 2. File descriptor recap — kernel ko open files track kyu karni padti hain?
+
+Jab bhi system mein koi process start hoti hai, wo internally libraries, config files, data files ya devices ko use karti hai. Linux mein in sabko **open files** ki tarah consider kiya jata hai.
+
+Kernel OS ka sabse powerful component hai. Agar kernel ko pata hi nahi ki system mein kaunsi files open hain, kaun kis process ke saath judi hai, to control possible nahi. Isliye kernel ko open files ko **monitor/track** karna hota hai.
+
+Is tracking ke liye Linux/Unix file descriptor concept use karta hai.
+
+Easy definition:
+
+> File descriptor ek non-negative integer number hota hai jo process ke point of view se kisi open file/data-source ko identify karta hai.
+
+Windows side par similar idea ko **file handles** se relate kar sakte ho.
+
+---
+
+## 3. Teeno tables ka simple relation
+
+Trainer board par 3 tables discuss karta hai. Ye OS internals bohot bada topic hai, lekin basic working model ye hai:
+
+### 3.1 Inode table
+
+Har file ka ek unique **inode number** hota hai. Inode table entry ke andar file ka metadata hota hai, jaise:
+
+- file ka size
+- timestamps
+- owner/group
+- permissions
+- file ka actual data storage location/filesystem address
+- file type related info
+
+Dhyan do: inode mein usually file ka **name** nahi hota; name directory entry mein hota hai, actual metadata inode mein.
+
+### 3.2 Global file table
+
+Jab file open hoti hai, kernel global file table mein entry banata hai. Ye table open file instance ko represent karti hai aur inode table tak reference rakhti hai.
+
+Trainer ke 3 points yaad rakho:
+
+1. **Create entry in global file table**
+2. **Provide the location of the entry**
+3. Process ko us entry tak pahunchne ka reference/descriptor dena
+
+### 3.3 File descriptor table
+
+Ye **per-process** table hoti hai. Matlab har process ki apni FD table hoti hai. Ye hidden table hoti hai jo sirf kernel update karta hai; process apni table directly modify nahi karti.
+
+Flow simplified:
+
+```text
+Process
+  └─ file descriptor number (0,1,2,3...)
+        └─ points to Global File Table entry
+              └─ points to Inode Table entry
+                    └─ points to actual file data on filesystem
 ```
 
-### 2.2 `tail` — from the bottom
+Isliye jab hum `cat file`, `date > out`, ya `cmd 2> /dev/null` karte hain, background mein FD/streams ka concept kaam kar raha hota hai.
+
+---
+
+## 4. First 3 FD entries — redirection ka real base
+
+Process create hote hi first 3 entries reserved/fixed hoti hain:
+
+| FD | Stream | Default device in class | Redirect symbol |
+|---:|---|---|---|
+| **0** | `stdin` | keyboard | `<` / `0<` |
+| **1** | `stdout` | screen/terminal | `>` / `1>` |
+| **2** | `stderr` | screen/terminal | `2>` |
+
+Day 3 ka practical ab is FD model se link hota hai:
+
+- `date > out.txt` → stdout (FD 1) ko file mein bhejo
+- `cat < file` → file ko stdin (FD 0) banao
+- `cat hello 2> /dev/null` → stderr (FD 2) ko discard device mein bhejo
+- `cmd > run.log 2>&1` → stdout file mein, phir stderr bhi stdout ke destination par
+
+Trainer kehte hain: file descriptor concept boring lag sakta hai, lekin iske bina redirection sirf rat-ta hua lagta hai. Ek baar FD clear ho gaya to `>`, `<`, `2>`, `2>&1` sab logical lagne lagte hain.
+
+---
+
+## 5. Text output ka controlled viewing — `cat` hamesha enough nahi
+
+`cat` poora content ek saath screen par daal deta hai. Agar file 1000+ lines ki ho, to scroll karna time waste hota hai. Isliye hum output ko control karke dekhte hain.
+
+Linux admin workflow trainer batate hain:
+
+1. **Step 1:** pehle single command se kaam hone ki koshish karo.
+2. **Step 2:** same command ke flags/options se kaam ho jaye to best.
+3. **Step 3:** agar kaam na ho, tab commands ko pipe `|` se jodo.
+
+---
+
+## 6. `head` — file/output ki top lines
+
+`head` file ke top/beginning lines dikhata hai.
 
 ```bash
-tail /etc/passwd          # last 10 lines (default)
-tail -5 /etc/passwd       # last 5 lines
+head /etc/passwd
 ```
 
-| Command | Reads from | Default |
-|---|---|---|
-| `head` | top | 10 lines |
-| `tail` | bottom | 10 lines |
+Default: top 10 lines.
 
-### 2.3 `less` — page-by-page viewer
+Specific number:
+
+```bash
+head -n 15 /etc/passwd
+head -n 5 /etc/passwd
+```
+
+Command output ke upar bhi pipe se use kar sakte ho:
+
+```bash
+lscpu | head -n 8
+```
+
+Matlab: `lscpu` ka poora output lene ke bajaye sirf starting 8 lines dekh lo.
+
+---
+
+## 7. `tail` — file/output ki bottom lines
+
+`tail` file ke end/bottom lines dikhata hai.
+
+```bash
+tail /etc/passwd
+```
+
+Default: last 10 lines.
+
+Specific number:
+
+```bash
+tail -n 5 /etc/passwd
+tail -n 15 /var/log/syslog
+```
+
+Logs mein `tail` bahut common hai kyunki latest events mostly file ke end mein hote hain.
+
+---
+
+## 8. `less` — bada file page-by-page padhna
+
+`less` text file ko page-by-page view karne ke liye best hai.
 
 ```bash
 less demo.txt
 ```
 
-Loads the file **page by page** instead of dumping it. Essential for large log files.
+Transcript ke important keys:
 
-**Navigation keys:**
-
-| Key | Action |
+| Key | Kaam |
 |---|---|
-| **↓ / ↑** | Move **line by line** |
-| **Page Down** | Move **page by page** downward |
-| **Page Up** | Move **page by page** upward |
-| **End** | Jump to the **end** of the file |
-| **Home** | Jump back to the **first** line |
+| `Down Arrow` | line-by-line neeche jao |
+| `Up Arrow` | line-by-line upar jao |
+| `Page Down` | ek page neeche |
+| `Page Up` | ek page upar |
+| `/pattern` | top-to-bottom search karo |
+| `n` | next match par jao |
+| `?pattern` | bottom-to-top search karo |
+| `End` | file ke end mein jao |
+| `Home` | file ke start/top mein jao |
+| `q` | quit/exit |
 
-**Searching:**
+Example: `/etc` mein `system` search karna ho to `less` open karke `/system` dabao; next match ke liye `n`. Backward direction mein dhoondhna ho to `?system`.
 
-| Key | Action |
-|---|---|
-| `/pattern` | Search **forward** (top → bottom). Matches are **highlighted**. |
-| `?pattern` | Search **backward** (bottom → top) |
-| `n` | Jump to the **next** match |
-| `N` (capital) | Jump to the **previous** match |
+`more` bhi similar pager hai; trainer bolte hain use khud practice karo kyunki basic idea `less` jaisa hi hai.
 
-**Quitting:**
+---
 
-| Key | Action |
-|---|---|
-| `q` | **Quit** `less` |
+## 9. `tac` — `cat` ka reverse
 
-> Lowercase `q`, no Shift, Caps Lock off. Do **not** close the terminal to escape `less` — press `q`.
-
-A related command, **`more`**, behaves similarly and was left as self-practice.
-
-### 2.4 `tac` — reverse of `cat`
+`tac` file ko bottom-to-top dikhata hai. Name bhi `cat` ka reverse hai.
 
 ```bash
 tac /etc/passwd
 ```
 
-Prints the file **bottom to top** — the lines in reverse order. (`tac` is `cat` spelled backwards.)
+Kaam kab aata hai? Jab aapko file ka latest log bottom mein hai aur reverse order mein quickly dekhna ho. Logs ke saath `tac`/`tail` ka combination useful ho sakta hai.
 
 ---
 
-## Part 3 — `wc` (word count)
+## 10. `wc` — lines, words aur characters count
+
+`wc` = word count.
 
 ```bash
 wc /etc/passwd
 ```
 
-Default output is three numbers:
+Default output ke 3 numbers hote hain:
 
-| Position | Meaning |
-|---|---|
-| 1st | number of **lines** |
-| 2nd | number of **words** |
-| 3rd | number of **characters/bytes** |
+```text
+lines  words  characters  filename
+```
 
-**Flags:**
+Transcript example mein file ke andar 59 lines, 97 words aur 599 characters jaise counts dikhaye gaye (exact numbers demo file ke hisaab se the).
 
-| Flag | Shows only |
-|---|---|
-| `-l` | lines |
-| `-w` | words |
-| `-c` | characters |
-
-**Syntax:** `wc [options] filename`
-
-### Using `wc` on command output
-
-`wc` operates on files, not on other commands directly. To count the output of a command, **pipe it**:
+Flags:
 
 ```bash
-lscpu | wc -l          # count lines of lscpu output
-ls | wc -l             # count entries in a directory
+wc -l file     # only lines
+wc -w file     # only words
+wc -c file     # only characters/bytes
 ```
 
-This is the Day 3 pipe concept being put to work.
+Important clarification: `wc` command ke options operate nahi karti; wo input stream/file ka count karti hai. Agar kisi command ka output count karna hai, pipe do:
+
+```bash
+lscpu | wc
+lscpu | wc -l
+```
+
+Trainer ye bhi batate hain ki command combine karne ka time tab aata hai jab single command + options se kaam na ho.
 
 ---
 
-## Part 4 — The three-step Linux admin workflow
+## 11. Output filtering/manipulation series — `sed` ka intro
 
-A genuinely useful mental model given in this session:
+Trainer announce karte hain ki ab ek important command series shuru hogi jisse kisi bhi output ke saath fast filtering/manipulation kar sakte ho. Is series mein stream/text processing commands aayengi; Day 4 ka start hai **`sed`**.
 
-| Step | Approach |
-|---|---|
-| **1** | Try to get the result with the **command** alone. |
-| **2** | If not, try the command's **flags/options**. |
-| **3** | If still not, **join commands with pipes** (`\|`) and build the output from pieces. |
+`sed` = **stream editor**.
 
-Reach for complexity only when the simpler level fails.
+Basic syntax:
 
----
-
-## Part 5 — `sed`, the Stream Editor
-
-Introduced as the first in a planned series of high-value commands: **`sed`, `cut`, `locate`** and more. The pitch: master these and you can extract, filter and reshape any output quickly.
-
-### 5.1 Syntax
-
-```
+```bash
 sed [options] 'action' filename
 ```
 
-The action goes in **single quotes**.
+Important nature:
 
-### 5.2 Key property: `sed` works on LINE NUMBERS
+- `sed` line-by-line kaam karta hai.
+- Normal output screen par aata hai; original file tab change hoti hai jab `-i` use karo.
+- `-n` ke saath hum sirf wahi print karte hain jo `p` action se explicit bola jaye.
 
-Unlike `head`/`tail`, which think in terms of "from the top" or "from the bottom", **`sed` has no notion of direction — it addresses lines by number.**
+Transcript mein trainer initially sed ke use batata hai: printing, deleting after line numbers, substitution. Aaj focus printing aur substitution par hai.
 
-Helpful companion for seeing line numbers:
+---
+
+## 12. `sed` se specific lines print karna
+
+`/etc/passwd` jaise file par examples:
+
+### Sirf first line print
 
 ```bash
-cat -n /etc/passwd        # print the file WITH line numbers
+sed -n '1p' /etc/passwd
 ```
 
-### 5.3 Printing specific lines
+Agar `-n` na do, to sed normal behaviour mein matched print ke saath baaki lines bhi repeat kar sakta hai; isliye controlled printing ke liye `-n '...p'` pattern use hota hai.
 
-The `-n` flag suppresses `sed`'s default behaviour of echoing every line. **Without `-n`, `sed 'Np'` prints the whole file and duplicates line N.**
+### Line 1 aur line 5 dono print
 
 ```bash
-sed -n '1p' /etc/passwd        # only line 1
-sed -n '1p;5p' /etc/passwd     # lines 1 and 5   (; = separator)
-sed -n '1,7p' /etc/passwd      # lines 1 through 7  (, = range)
-sed -n '1p;$p' /etc/passwd     # first line and last line  ($ = last)
+sed -n '1p;5p' /etc/passwd
 ```
 
-| Symbol | Meaning |
-|---|---|
-| `p` | print |
-| `;` | separator between actions |
-| `,` | range (from, to) |
-| `$` | the last line |
-| `-n` | suppress automatic printing |
+Semicolon `;` actions ko separate karta hai.
 
-### 5.4 Substitution — search and replace
+### Range of lines print
+
+```bash
+sed -n '3,7p' /etc/passwd
+```
+
+Matlab line 3 se 7 tak print karo.
+
+### Last line print
+
+```bash
+sed -n '$p' /etc/passwd
+```
+
+`$` ka matlab last line.
+
+### First aur last line dono
+
+```bash
+sed -n '1p;$p' /etc/passwd
+```
+
+---
+
+## 13. `sed` substitution — search and replace on screen
+
+Substitution ka basic pattern:
+
+```bash
+sed 's/old/new/' file
+```
+
+Example transcript style: `/etc/passwd` mein `root` ko screen par `sachin` se replace karke dikhana.
 
 ```bash
 sed 's/root/sachin/' /etc/passwd
 ```
 
-Reads as: **s**ubstitute `root` with `sachin`. By default this replaces **only the first occurrence on each line**.
+Important: ye command original file change nahi karti; output screen par modified dikhata hai.
 
-| Form | Effect |
-|---|---|
-| `s/old/new/` | first occurrence per line |
-| `s/old/new/g` | **global** — every occurrence |
-| `s/old/new/2` | only the **2nd** occurrence |
-| `s/old/new/2g` | from the **2nd occurrence onward**, all of them |
-| `1s/old/new/` | only on **line 1** |
-| `1,7s/old/new/` | only within **lines 1–7** |
+Default behaviour: bina `g` ke substitution pattern ka **first occurrence per line** replace karta hai.
 
-### 5.5 Case sensitivity
-
-**Linux is case-sensitive**, so `nologin` and `NOLOGIN` are different strings — a substitution for one will not touch the other.
-
-To make the match **case-insensitive**, add the `i` flag:
+Global replace per line:
 
 ```bash
-sed 's/nologin/sachin/gi' /etc/passwd
+sed 's/root/sachin/g' /etc/passwd
 ```
 
-| Flag | Meaning |
-|---|---|
-| `g` | global (all occurrences) |
-| `i` | ignore case |
-| `gi` | both |
+`g` = global — us line ke saare matches replace.
 
-### 5.6 Multiple substitutions in one command
-
-```bash
-sed 's/nologin/network/g; s/root/sachin/g' /etc/passwd
-```
-
-Separate the actions with a **semicolon**. The `-e` flag is an alternative way to chain expressions.
-
-### 5.7 `-i` — editing the file in place
-
-By default **`sed` only changes the output on screen; the original file is untouched.** To modify the file permanently:
-
-```bash
-sed -i 's/nologin/petrol/g' sample.txt
-```
-
-### ⚠ Safety rule stated in class
-
-> **Always run your `sed` task on screen first and check the result. Never go straight to `-i` on the real file.**
-
-In the demo the trainer deliberately worked on a **copy** (`cp` to `sample.txt`) before using `-i`, precisely because `/etc/passwd` was the original. Follow that pattern.
+Linux/sed case-sensitive hote hain; agar file mein `nologin` hai aur aap `NoLogin` search karoge, match nahi hoga.
 
 ---
 
-## Part 6 — Homework question set in class
+## 14. Specific line ya specific occurrence par substitution
 
-> Using the `/etc/passwd`-style file shown on screen, produce an output containing **line numbers 1–5, 11–15, and up to 25**, with a further selection at line 50.
-
-Answers were invited in the video comments. A workable approach:
+### Sirf line 7 par substitution
 
 ```bash
-sed -n '1,5p;11,15p;25p;50p' filename
+sed '7s/nologin/sachin/' /etc/passwd
 ```
+
+Ya line 7 ke saare matches:
+
+```bash
+sed '7s/nologin/sachin/g' /etc/passwd
+```
+
+### Second occurrence replace
+
+GNU sed mein number flags se occurrence choose kar sakte ho:
+
+```bash
+sed 's/root/sachin/2' /etc/passwd
+```
+
+Ye per-addressed-line second match ko target karta hai. Agar second occurrence onwards sab replace karne hon, GNU sed supports `2g` style usage, but beginner ke liye pehle `g` aur line-addressing clear hona chahiye.
+
+### Multiple substitutions
+
+Multiple expressions ko `-e` se de sakte ho:
+
+```bash
+sed -e 's/root/sachin/g' -e 's/nologin/patron/g' sample.txt
+```
+
+Ye screen output mein dono replacements karega.
 
 ---
 
-## Part 7 — Complete cheat sheet
+## 15. Permanent change — `-i` use karne se pehle warning
+
+Agar change original file ke andar permanently karna hai:
 
 ```bash
-# Viewing
-head file              # first 10 lines
-head -5 file           # first 5
-tail file              # last 10
-tail -5 file           # last 5
-cmd | head -15         # on piped output
-tac file               # reversed, bottom to top
-cat -n file            # with line numbers
+sed -i 's/nologin/patron/g' sample.txt
+```
 
-# Paging
-less file              # page-by-page
-  ↓ ↑          line by line
-  PgDn PgUp    page by page
-  Home / End   first / last line
-  /pattern     search forward
-  ?pattern     search backward
-  n / N        next / previous match
-  q            quit
+Transcript ka strong advice:
 
-# Counting
-wc file                # lines, words, characters
-wc -l file             # lines only
-wc -w file             # words only
-wc -c file             # characters only
-ls | wc -l             # count via pipe
+> Pehle command ko on-screen run karke dekho. Jab output sahi lage, tab `-i` lagao. Direct file mein edit mat karo, warna original content galat ho sakta hai aur future mein problem aa sakti hai.
 
-# sed — stream editor
-sed -n '1p' file               # print line 1
-sed -n '1p;5p' file            # lines 1 and 5
-sed -n '1,7p' file             # lines 1-7
-sed -n '1p;$p' file            # first and last
-sed 's/old/new/' file          # first match per line
-sed 's/old/new/g' file         # all matches
-sed 's/old/new/2' file         # 2nd occurrence only
-sed 's/old/new/2g' file        # 2nd onward
-sed '1s/old/new/' file         # only line 1
-sed 's/old/new/gi' file        # case-insensitive
-sed 's/a/b/g; s/c/d/g' file    # multiple actions
-sed -i 's/old/new/g' file      # EDIT THE FILE (careful!)
+Safety workflow:
+
+```bash
+# Step 1: screen test
+sed 's/nologin/patron/g' sample.txt | less
+
+# Step 2: jab output sahi lage
+sed -i 's/nologin/patron/g' sample.txt
+```
+
+Production ya important config par `-i` se pehle backup lena best practice hai:
+
+```bash
+cp sample.txt sample.txt.bak
 ```
 
 ---
 
-## Part 8 — Self-check questions
+## 16. Day 4 ke common mistakes
 
-1. Trace the path from typing a command to an open file being tracked by the kernel.
-2. Why must the kernel monitor open files? State the rule in one sentence.
-3. Name the three kernel tables and what each holds.
-4. Why can a process not edit its own file descriptor table?
-5. What is an inode number and what is unique about it?
-6. Which metadata lives in the inode table?
-7. Default line counts for `head` and `tail`, and how to change them.
-8. In `less`: how do you search forward, search backward, go to the next match, jump to the end, and quit?
-9. What does `tac` do?
-10. Interpret the three numbers `wc` prints. Which flag gives only words?
-11. Why does `wc` need a pipe to count a command's output?
-12. State the three-step Linux admin workflow.
-13. Why does `sed -n` matter when printing a line?
-14. Write `sed` commands for: line 3 only; lines 2–8; first and last line.
-15. Difference between `s/a/b/`, `s/a/b/g`, `s/a/b/3`, and `s/a/b/3g`.
-16. How do you make a `sed` substitution case-insensitive, and why is it needed?
-17. What does `-i` do, and what is the safety rule around it?
+1. `head`/`tail` default 10 lines yaad na rakhna.
+2. `less` ke andar stuck ho jana — exit key `q` hai.
+3. `wc -c` ko sirf “characters” samajhna; bytes/characters locale par depend kar sakta hai.
+4. `wc` ko kisi command ke options par lagane ki sochna; output count ke liye pipe use karo.
+5. `sed -n '1p'` mein `-n` bhool jana, phir duplicate output dekh kar confuse hona.
+6. `sed 's/old/new/'` ko permanent edit samajhna — ye default screen output hai.
+7. Case sensitivity ignore karna — `root`, `Root`, `ROOT` same nahi.
+8. `-i` directly production/config file par chala dena bina screen test/backup ke.
 
 ---
 
-## Part 9 — Coming up next
+## 17. Final takeaway
 
-The announced **command series** continues with **`cut`**, **`locate`** and further text-processing tools — the toolkit for slicing any command output into exactly the fields you need.
+Day 4 mein teen cheezein solid honi chahiye:
+
+1. **FD model clear** — process FD number use karta hai; kernel global file table/inode table ke saath actual file track karta hai; first 3 FDs stdin/stdout/stderr hain.
+2. **Viewing commands** — bade text output ko `head`, `tail`, `less`, `tac` aur `wc` se control karo.
+3. **`sed` power start** — line-number based printing (`-n '1p'`, ranges, `$`) aur substitution (`s/old/new/`, `g`, line-address, `-i`) se text manipulate karna.
+
+Trainer ka bottom line: pehle on-screen test karo, phir file modify karo. Commands ratne se zyada, output ka flow samajhna important hai — stdin se input, stdout/ stderr ka separation, aur file/table ke concept se redirection connect hota hai.
