@@ -1,439 +1,677 @@
-# Explanation — Day 15 (Final): SSH, Encryption & SSH Hardening
+# Kali Linux Day 15 — SSH, Encryption aur SSH Hardening (Hinglish Explanation)
 
-**Lecture:** 016 — Kali Linux Free Capsule Course, Day 15 — **the final session**
-**Translation:** [`english/016 - Kali Linux Free Capsule Course - Day 15.md`](../english/016%20-%20Kali%20Linux%20Free%20Capsule%20Course%20-%20Day%2015.md)
-
-> **"Until you have knowledge about SSH, you cannot do anything."** — stated in the context of CTFs and practical security work.
+**Source transcript:** `transcripts/016 - Kali Linux Free Capsule Course - Day 15 [ Hindi ].hi-orig.srt`
+**Trainer in transcript:** Nitesh Singh (Defronix)
+**Course context:** Kali Linux capsule course ka final session; OSINT series transcript 015 ke baad interleaved hai.
+**Builds on:** Day 7–10 users, groups, permissions; Day 12 package management; Day 14 password/boot security
+**Note:** Ye explanation Hindi original transcript ko context ke saath samajh kar likhi gayi hai; ye literal translation nahi hai. SSH commands aur hardening examples sirf owned/authorized lab machines ke liye hain. Production SSH configuration change se pehle backup, alternate access aur syntax validation zaruri hai.
 
 ---
 
-## Part 1 — What SSH is
+## 1. Day 15 ka focus
 
-> **SSH is a network communication protocol that enables two computers to communicate and share data.**
+Final Kali capsule session ka main topic **SSH — Secure Shell** hai:
+
+- SSH kya hai aur remote communication kaise hoti hai?
+- Encryption ka basic concept
+- Symmetric vs asymmetric encryption
+- `openssh-server` installation/service management
+- `ssh` se remote login aur remote command
+- `scp` se secure file copy
+- SSH key-based/passwordless authentication
+- `sshd_config` ke through SSH hardening
+- Root login, port, allowed users/groups aur source restrictions
+
+Trainer ka practical point hai ki security lab/CTF/server work mein remote shell aur secure file transfer ka knowledge foundational hai.
+
+---
+
+## 2. SSH kya hota hai?
 
 **SSH = Secure Shell.**
 
-### The practical motivation
+Ye network protocol hai jo do computers ke beech encrypted communication, remote shell aur secure data transfer provide karta hai.
 
-You run Kali in a VM. All your work is in the terminal anyway. So why keep switching to the VM window and logging in?
+Practical VM scenario:
 
-> Leave the VM **running in the background** and **remote into it** from your host OS terminal.
-
-### Why it's "secure"
-
-> **SSH creates a TUNNEL between you and the server — a secure tunnel — through which all data is shared in ENCRYPTED form.**
-
----
-
-## Part 2 — Encryption fundamentals
-
-### What encryption is
-
-> **Converting plain text into an UNREADABLE form.**
-
-### The two types
-
-| | **Symmetric** | **Asymmetric** |
-|---|---|---|
-| Keys | **One key** | **Two: public + private** |
-| Same key encrypts & decrypts? | Yes | No |
-| Private key | — | **Never leaves its owner** |
-| Public key | — | **Shared freely** |
-| Used by SSH | — | ✅ (RSA) |
-
-### How asymmetric works
-
-```
-User 1 generates:  [public key] + [private key]
-User 1 shares:     [public key]  →  User 2
-User 2 encrypts data with User 1's PUBLIC key
-Only User 1 can decrypt it — with their PRIVATE key
-```
-
-**The security property:**
-
-> **Even if a hacker captures the data in transit, they cannot decrypt it.** Only the holder of the **private key** can.
-
-### The lock-and-key analogy
-
-> One lock with two keys: **one key always stays with the lock's owner; the second is shared.** Anyone can lock something with the shared key — **but only the owner's key can open it.**
-
----
-
-## Part 3 — Installing and managing SSH
-
-```bash
-sudo apt install openssh-server
-```
-
-> **Until this package is installed, you cannot use the SSH service.**
-
-### Service control — two equivalent methods
-
-```bash
-# Method 1
-sudo service ssh status / start / stop / restart
-
-# Method 2
-sudo systemctl status ssh / start ssh / stop ssh / restart ssh
-```
-
-### ⚠ VM network setting
-
-> **The adapter must be in BRIDGED MODE**, otherwise remote access within your LAN will not work.
-
-*(This connects back to Day 12's troubleshooting section, where Bridged↔NAT switching was the fix for package problems.)*
-
----
-
-## Part 4 — Configuration files
-
-Everything lives in **`/etc/ssh/`**.
-
-| File | Role |
-|---|---|
-| **`ssh_config`** | **CLIENT** configuration — for outgoing connections |
-| **`sshd_config`** | **SERVER (daemon)** configuration — the one you harden |
-| `ssh_host_*_key` / `.pub` | The host's own key pair |
-
-### What a "daemon" is
-
-> When you install a package, **a SERVICE is created — a PROCESS.** That process is called a service, and **in Linux a service is called a DAEMON.**
-
-The `d` in `sshd` is literally "daemon". **`sshd_config` is the server-side file** — this is the distinction that trips people up.
-
----
-
-## Part 5 — Remote access
+1. Kali VM background mein run ho rahi hai.
+2. Aap host OS terminal se VM par connect karna chahte ho.
+3. VM window switch karne ke bajay SSH session open karte ho.
 
 ```bash
 ssh username@ip_address
-ssh username@hostname        # hostname also works
 ```
 
-**Verify where you actually are:**
+SSH ke through:
 
-```bash
-hostname          # which machine
-echo $USER        # which user
-```
+- remote terminal mil sakta hai,
+- commands run kar sakte ho,
+- files securely transfer kar sakte ho,
+- automation/scripts se multiple systems manage kar sakte ho.
 
-**Client tools mentioned:** **MobaXterm** (preferred — *"you can remote access MULTIPLE machines at once"*) or **PuTTY**.
+### 2.1 “Secure” kyu?
+
+SSH client aur server ke beech encrypted channel/tunnel establish karta hai. Network par captured traffic normally readable plaintext session ki tarah nahi hota.
+
+Encryption confidentiality provide karti hai, lekin security complete tab hoti hai jab:
+
+- host identity verify ho,
+- keys/passwords protected hon,
+- server patched/hardened ho,
+- access scope limited ho.
 
 ---
 
-## Part 6 — Running a command without logging in
+## 3. Encryption fundamentals
+
+### 3.1 Encryption kya hai?
+
+Plaintext ko aise transformed form mein convert karna jo unauthorized viewer ke liye unreadable ho, encryption ka basic idea hai.
+
+```text
+Plaintext + key -> ciphertext
+ciphertext + required key -> plaintext
+```
+
+### 3.2 Symmetric encryption
+
+Symmetric encryption mein same secret key encryption aur decryption ke liye use hoti hai.
+
+| Feature | Symmetric |
+|---|---|
+| Keys | One shared secret key |
+| Speed | Usually fast |
+| Challenge | Key ko securely share karna |
+
+Agar key network par unsafe way se share ho gayi, to confidentiality break ho sakti hai.
+
+### 3.3 Asymmetric encryption
+
+Asymmetric cryptography mein key pair hota hai:
+
+- **Public key** — share ki ja sakti hai.
+- **Private key** — owner ke paas secret rehni chahiye.
+
+Conceptual flow:
+
+```text
+User A public/private key pair generate karta hai.
+User A public key User B ko deta hai.
+User B public key se data encrypt karta hai.
+User A private key se decrypt karta hai.
+```
+
+Private key ke bina captured ciphertext ko decrypt karna intended model ke according possible nahi hona chahiye.
+
+### 3.4 Lock-and-key analogy
+
+- Public key ko aise lock ki tarah imagine karo jo share kiya ja sakta hai.
+- Koi bhi us lock se box lock kar sakta hai.
+- Private key owner ke paas rahti hai aur wahi box open karta hai.
+
+SSH actual operation mein public-key authentication, key exchange, symmetric session encryption aur host verification ke multiple mechanisms combine karta hai. Beginner level par public/private key distinction yaad rakhna important hai.
+
+---
+
+## 4. SSH install aur service management
+
+Kali/Debian system par SSH server package install karna:
+
+```bash
+sudo apt update
+sudo apt install openssh-server
+```
+
+SSH server daemon ka naam commonly `sshd` hai aur service unit `ssh` ho sakti hai.
+
+### 4.1 `systemctl`
+
+```bash
+sudo systemctl status ssh
+sudo systemctl start ssh
+sudo systemctl stop ssh
+sudo systemctl restart ssh
+```
+
+### 4.2 `service` compatibility command
+
+```bash
+sudo service ssh status
+sudo service ssh start
+sudo service ssh stop
+sudo service ssh restart
+```
+
+Service running aur listening port verify:
+
+```bash
+systemctl is-active ssh
+ss -lntp | grep ':22'
+```
+
+Exact process/port output system version par depend karega.
+
+### 4.3 VM networking
+
+Remote host se VM tak connection ke liye VM network adapter correctly configured hona chahiye. Trainer bridged mode ka example dete hain, jisme VM LAN par accessible IP le sakti hai.
+
+NAT mode mein host-to-guest access ke liye port forwarding required ho sakti hai. Host-only mode internet/LAN connectivity ko restrict kar sakta hai.
+
+Check:
+
+```bash
+ip addr
+ip route
+hostname -I
+```
+
+Firewall/security group bhi port access block kar sakta hai.
+
+---
+
+## 5. SSH configuration files
+
+SSH related files commonly:
+
+```text
+/etc/ssh/
+```
+
+### 5.1 Client vs server configuration
+
+| File | Role |
+|---|---|
+| `/etc/ssh/ssh_config` | Client-side outgoing SSH configuration |
+| `/etc/ssh/sshd_config` | Server daemon configuration; hardening yahan |
+| `/etc/ssh/ssh_host_*` | Server host identity key files |
+
+`sshd_config` mein `d` daemon ko indicate karta hai. Server-side changes ke baad SSH daemon reload/restart karna pad sakta hai.
+
+Config syntax check:
+
+```bash
+sudo sshd -t
+```
+
+Backup:
+
+```bash
+sudo cp -a /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
+```
+
+Remote production machine par restart se pehle current session open rakho, warna bad config se lockout ho sakta hai.
+
+---
+
+## 6. Remote login
+
+```bash
+ssh username@ip_address
+ssh username@hostname
+```
+
+Example format:
+
+```bash
+ssh kali@192.168.1.148
+```
+
+First connection par host-key confirmation prompt aa sakta hai. Host fingerprint ko trusted source se verify karke hi accept karo; blindly `yes` press karna man-in-the-middle risk create kar sakta hai.
+
+Remote machine verify:
+
+```bash
+hostname
+echo "$USER"
+pwd
+```
+
+Client tools ke roop mein terminal SSH, MobaXterm aur PuTTY ka mention hota hai. Tool choice OS/platform par depend karegi.
+
+---
+
+## 7. Login ke bina remote command
+
+SSH command ke end par remote command pass kar sakte ho:
 
 ```bash
 ssh kali@192.168.1.148 hostname
 ssh kali@192.168.1.148 pwd
 ```
 
-> **It does NOT log in** — it runs the command remotely and **prints the output on your screen.**
+Ye interactive shell open karne ke bajay remote command run karke output local terminal par print karta hai.
 
-Extremely useful for scripting and for quick one-off checks across machines.
+Use cases:
+
+- remote hostname/uptime check,
+- service status collect,
+- script automation,
+- multiple authorized machines ka inventory.
+
+Example:
+
+```bash
+ssh user@server 'systemctl is-active ssh'
+```
+
+Remote command quoting carefully use karo; local shell expansion aur remote shell expansion alag stages par ho sakti hai.
 
 ---
 
-## Part 7 — `scp` — secure file copy
+## 8. `scp` — secure file copy
+
+`scp` SSH transport use karke files copy karta hai.
+
+Local se remote:
 
 ```bash
-scp <source_full_path> <user>@<ip>:<destination_path>
-scp -r <directory>     <user>@<ip>:<path>       # recursive
+scp /absolute/path/report.txt user@server:/home/user/
 ```
 
-**Example:**
+Remote se local:
 
 ```bash
-scp /home/matrix/demo.txt kali@192.168.1.148:/home/kali/
+scp user@server:/home/user/report.txt /tmp/
 ```
 
-### Two details that catch people out
+Directory recursive copy:
 
-1. **The colon `:`** separates the address from the destination path. Forget it and `scp` treats the whole thing as a local filename.
-2. **Use absolute paths** on both sides.
+```bash
+scp -r /path/to/directory user@server:/destination/
+```
 
-> **"It is a very secure way. If you share a file in this manner, it will not be compromised."**
+### 8.1 Colon ka role
 
-**Why it matters:** flagged as very useful **in CTFs** — moving files between attacker and target machines.
+Remote destination format mein colon mandatory separator hai:
+
+```text
+user@server:/remote/path
+```
+
+Colon miss karne par `scp` target ko local filename/path samajh sakta hai.
+
+### 8.2 Absolute paths aur security
+
+Absolute path confusion reduce karta hai. Copy se pehle:
+
+- destination path verify,
+- file sensitivity check,
+- permissions/ownership review,
+- authorized endpoint confirm
+karo.
+
+SSH encryption transport ko protect karta hai, lekin wrong destination ya compromised endpoint se data automatically safe nahi ho jata.
 
 ---
 
-## Part 8 — ⭐ Passwordless authentication
+## 9. SSH key-based authentication
 
-### The motivation
+Password repeatedly type karna shoulder-surfing aur password-reuse risk create kar sakta hai. SSH key pair se passwordless/key-based login possible hai.
 
-> You are working **in a public place.** People come and go; **someone is sitting behind you watching.**
->
-> **Shoulder-surfing** — your password becomes known simply because you typed it where someone could see.
+### 9.1 `.ssh` directory
 
-Passwordless auth removes the password from the equation entirely.
-
-### The five steps
-
-#### Step 1 — Ensure `~/.ssh` exists with correct permissions
+Client par:
 
 ```bash
-mkdir -m 700 ~/.ssh          # create with permissions in one step
-# or
-mkdir ~/.ssh && chmod 700 ~/.ssh
+mkdir -m 700 ~/.ssh
 ```
 
-> ⚠ **The permission MUST be 700** — owner only, nobody else. SSH refuses to work with looser permissions.
+Agar directory already hai:
 
-**Note:** on most systems `.ssh` is created automatically; **on recent Kali it often is not**, so create it yourself.
+```bash
+chmod 700 ~/.ssh
+```
 
-#### Step 2 — Understand `known_hosts`
+SSH private files ke permissions strict hone chahiye. Exact files/permissions ko `ls -la ~/.ssh` se check karo.
 
-> **`known_hosts` holds the PUBLIC KEYS of hosts you have communicated with** — machines with which your communication has been established.
-
-#### Step 3 — Generate the key pair
+### 9.2 Key pair generate karna
 
 ```bash
 ssh-keygen
 ```
 
 Prompts:
-1. **Where to save** — press Enter for the default (`~/.ssh/`)
-2. **Passphrase** — optional; see below
 
-**Result:**
+1. Key file location — default accept kar sakte ho.
+2. Passphrase — strongly recommended, especially private key theft risk ke against.
 
-| File | What it is |
-|---|---|
-| **`id_rsa`** | your **PRIVATE** key — **never share** |
-| **`id_rsa.pub`** | your **PUBLIC** key — this gets shared |
+Typical files:
 
-> `ssh-keygen` creates `~/.ssh` itself if it doesn't exist — the manual step above is belt-and-braces.
-
-#### ⚠ Should you set a passphrase?
-
-> **"IF SOME USER GETS YOUR PRIVATE KEY, then what will you do?"**
-
-| Choice | Trade-off |
-|---|---|
-| **No passphrase** | Fully passwordless, but **a stolen private key = full access** |
-| **With passphrase** | One extra step, but **a stolen key is useless without it** |
-
-> *"If someone steals your private key — even if they steal it — they will not be able to use it."*
-
-#### Step 4 — Prepare the target machine
-
-The **destination** also needs `~/.ssh` at **700**.
-
-> *"The USB route isn't possible, because nobody will give you entry into a server room"* — hence the need for the next step.
-
-#### Step 5 — `ssh-copy-id` — the one-command solution ⭐
-
-```bash
-ssh-copy-id -i ~/.ssh/id_rsa.pub username@ip_address
+```text
+~/.ssh/id_rsa       private key
+~/.ssh/id_rsa.pub   public key
 ```
 
-**First connection prompt:**
-
-> *"Are you sure you want to continue connecting? yes/no"*
->
-> **This appears the FIRST time you connect to a machine via SSH**, because keys are being exchanged in the background.
-
-**Result on the server:** a file called **`authorized_keys`** appears in `~/.ssh/` — containing **exactly your public key**.
+Modern systems Ed25519 default/strong option offer kar sakte hain:
 
 ```bash
-cat ~/.ssh/authorized_keys      # same content as your id_rsa.pub
+ssh-keygen -t ed25519
 ```
 
-**Now test:**
+Transcript RSA naming par focus karta hai; actual system ke supported algorithm aur policy follow karo.
 
-```bash
-ssh username@ip_address         # no password prompt
-```
+### 9.3 Private key kabhi share mat karo
 
-### The three key files, summarised
-
-| File | Lives on | Contains |
+| File | Share? | Meaning |
 |---|---|---|
-| `id_rsa` | **your** machine | your private key |
-| `id_rsa.pub` | **your** machine | your public key |
-| `authorized_keys` | **the server** | public keys allowed to log in |
-| `known_hosts` | **your** machine | public keys of servers you've visited |
+| `id_rsa` / private key | **Never** | Secret authentication key |
+| `id_rsa.pub` / public key | Target server par install kar sakte ho | Login authorization material |
+
+Private key copy ho jaye to attacker key ka misuse kar sakta hai. Passphrase private key ko extra protection deti hai, lekin private key theft ko ignore nahi karna chahiye.
+
+### 9.4 `known_hosts`
+
+Client ki:
+
+```text
+~/.ssh/known_hosts
+```
+
+file previously contacted server host keys/fingerprints store kar sakti hai. First connection par fingerprint verify karo. Unexpected host-key change warning ko blindly bypass mat karo; DNS/IP reuse, reinstallation ya MITM possibilities investigate karo.
+
+### 9.5 `ssh-copy-id`
+
+Public key server ke authorized keys mein install karne ka common helper:
+
+```bash
+ssh-copy-id -i ~/.ssh/id_rsa.pub username@server
+```
+
+Target server par public key commonly yahan append hoti hai:
+
+```text
+~/.ssh/authorized_keys
+```
+
+Verify:
+
+```bash
+cat ~/.ssh/authorized_keys
+```
+
+File permissions:
+
+```bash
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/id_rsa
+chmod 644 ~/.ssh/id_rsa.pub
+```
+
+Ab test:
+
+```bash
+ssh username@server
+```
+
+Passphrase set hai to key passphrase prompt aa sakta hai; ye account password prompt se different hai.
+
+### 9.6 Key files ka recap
+
+| File | Machine | Role |
+|---|---|---|
+| `id_rsa` | Client | Private key |
+| `id_rsa.pub` | Client/authorized distribution | Public key |
+| `authorized_keys` | Server | Allowed public keys |
+| `known_hosts` | Client | Known server host keys |
 
 ---
 
-## Part 9 — ⭐ SSH Hardening
+## 10. SSH hardening
 
-Four defensive measures, all configured in **`/etc/ssh/sshd_config`**.
+Server hardening generally `/etc/ssh/sshd_config` mein hoti hai. Change ke baad:
 
-> ⚠ **Restart the service after EVERY change:** `sudo systemctl restart ssh`
-
-### 9.1 Disable root login
-
+```bash
+sudo sshd -t
+sudo systemctl restart ssh
 ```
+
+Agar remote server hai to alternate session open rakho aur new session test karo before closing old one.
+
+### 10.1 Root login disable
+
+```text
 PermitRootLogin no
 ```
 
-**Default is often `prohibit-password` and commented out.** Uncomment and set to `no`.
+Config file mein setting uncomment/define karne ke baad test:
 
-**Result when someone tries:**
-
+```bash
+sudo sshd -t
+sudo systemctl restart ssh
 ```
-Permission denied (publickey, password)
+
+Effect: root direct SSH login refuse ho sakta hai, even if root password correct ho. Normal user login karke authorized `sudo` use karna safer model hai.
+
+Exact effective settings dekhne ke liye:
+
+```bash
+sudo sshd -T | grep -i permitrootlogin
 ```
 
-— **even with the correct root password.**
+### 10.2 Default port change
 
-> This enforces the Day 7 principle directly: log in as a normal user, elevate only when needed.
+Default SSH port commonly `22` hai. Example:
 
-### 9.2 Change the default port
-
-```
+```text
 Port 5152
 ```
 
-**The reasoning:**
-
-> **The default SSH port is 22.** When an attacker **scans your services**, they immediately see *"a service named SSH is running on port 22"* — and will **enumerate and attack it.**
->
-> Changing the port removes you from automated scans looking at 22.
-
-**Connecting afterwards requires `-p`:**
+Connect:
 
 ```bash
-ssh username@ip              # fails — nothing on 22
-ssh -p 5152 username@ip      # works
+ssh -p 5152 user@server
 ```
 
-> ⚠ **Choose a port that is actually FREE on your machine.**
+Port change automated scans/noise reduce kar sakta hai, lekin ye **security through obscurity** hai. Full port scan se non-default port discover ho sakta hai. Strong authentication, patching, firewall, rate limiting aur logging required hain.
 
-**Honest assessment:** this is *security through obscurity*. It stops opportunistic bots, not a determined attacker running a full port scan. Useful as one layer, not as the only one.
+Port choose karne se pehle ensure karo ki:
 
-### 9.3 Restrict which users may connect
+- port free hai,
+- firewall rule updated hai,
+- service actually listen kar rahi hai,
+- alternate connection tested hai.
 
-Add at the **end of the file**:
+### 10.3 `AllowUsers`
 
-```
+```text
 AllowUsers user1 user2
 ```
 
-Only those users can log in; everyone else is refused — demonstrated live with a third user being denied.
+Sirf listed users ko SSH login allow karne ka policy intent hai.
 
-### 9.4 The full set of access controls
+### 10.4 `DenyUsers`
 
-| Directive | Effect |
-|---|---|
-| `AllowUsers user1 user2` | **Only** these users |
-| `DenyUsers user1 user2` | **Block** these users, allow the rest |
-| `AllowUsers *@192.168.1.39` | Allow **any user from one IP** |
-| `DenyUsers *@192.168.1.39` | Block **any user from one IP** |
-| `DenyUsers *@192.168.1.0/24` | Block an **entire subnet** |
-| `AllowGroups groupname` | Allow an **entire group** |
+```text
+DenyUsers unwanted-user
+```
 
-### Why `AllowGroups` matters
+Listed users ko block karne ka policy intent hai.
 
-> **If there are 10 of you — instead of making 10 separate entries, CREATE A GROUP**, add all 10 users to it, and grant SSH access to the group.
+### 10.5 Source restriction examples
 
-This is the **exact same argument as Day 7's group management**: manage membership, not individual permissions. Add or remove a person from the group rather than editing `sshd_config` every time.
+```text
+AllowUsers user1@192.168.1.39
+DenyUsers user2@192.168.1.39
+DenyUsers *@192.168.1.0/24
+```
+
+Syntax/version behavior ko `man sshd_config` se verify karo. Network restriction ke liye firewall par bhi policy enforce karo; SSH config alone par depend mat karo.
+
+### 10.6 Group-based access — `AllowGroups`
+
+```text
+AllowGroups sshusers
+```
+
+Day 7 ke group-management principle ka direct use:
+
+1. `sshusers` group create karo.
+2. Authorized users ko group mein add karo.
+3. `AllowGroups sshusers` configure karo.
+4. New user add/remove karne ke liye membership change karo, config line nahi.
+
+```bash
+sudo groupadd sshusers
+sudo usermod -aG sshusers user1
+```
+
+Group membership new login/session mein effective ho sakti hai. Config syntax validate karke service reload/restart karo.
 
 ---
 
-## Part 10 — Complete cheat sheet
+## 11. SSH hardening checklist
+
+### Authentication
+
+- Root direct login disable.
+- Password login ki need assess karo; key-only policy carefully test karo.
+- Private keys passphrase se protect.
+- Weak/reused passwords avoid.
+- Authorized keys review.
+
+### Authorization
+
+- `AllowUsers` ya `AllowGroups` se scope restrict.
+- Old employees/unused accounts remove/lock.
+- `authorized_keys` stale entries audit.
+- Sudo access aur SSH access separately review.
+
+### Network
+
+- Firewall se SSH source network restrict.
+- Non-default port optional noise reduction only.
+- Internet-facing SSH par rate limiting/fail2ban type controls policy ke according.
+- Logs monitor.
+
+### Operations
+
+- `sshd -t` before restart.
+- Config backup.
+- Alternate session open.
+- New settings test.
+- Emergency recovery access documented.
+
+---
+
+## 12. Day 15 command summary
 
 ```bash
-# ---- install & service ----
+# Install and service
+sudo apt update
 sudo apt install openssh-server
-sudo systemctl start|stop|restart|status ssh
-sudo service ssh start|stop|restart|status
-# VM adapter must be in BRIDGED mode
+sudo systemctl status ssh
+sudo systemctl start ssh
+sudo systemctl restart ssh
 
-# ---- config files ----
-/etc/ssh/ssh_config      # CLIENT config
-/etc/ssh/sshd_config     # SERVER (daemon) config  <- harden this
+# Check network/listening
+ip addr
+hostname -I
+ss -lntp | grep ssh
 
-# ---- remote access ----
-ssh user@ip
-ssh user@hostname
-ssh -p 5152 user@ip                  # non-default port
-ssh user@ip hostname                 # run a command WITHOUT logging in
+# Validate config
+sudo sshd -t
+sudo sshd -T
 
-# ---- file transfer ----
-scp /path/file user@ip:/dest/path    # note the COLON
-scp -r /path/dir  user@ip:/dest/     # recursive
+# Remote access
+ssh user@server
+ssh -p 5152 user@server
+ssh user@server hostname
+ssh user@server 'pwd && id'
 
-# ---- passwordless auth ----
-mkdir -m 700 ~/.ssh                  # permissions MUST be 700
-ssh-keygen                           # creates id_rsa + id_rsa.pub
-ssh-copy-id -i ~/.ssh/id_rsa.pub user@ip
-ssh user@ip                          # no password
+# Copy
+scp /absolute/file user@server:/absolute/destination/
+scp user@server:/absolute/file /local/destination/
+scp -r /local/dir user@server:/remote/path/
 
-# key files
-~/.ssh/id_rsa            # PRIVATE — never share
-~/.ssh/id_rsa.pub        # PUBLIC  — shared
-~/.ssh/authorized_keys   # on the SERVER: keys allowed in
-~/.ssh/known_hosts       # on the CLIENT: servers you've visited
+# Key authentication
+mkdir -m 700 ~/.ssh
+ssh-keygen -t ed25519
+ssh-copy-id -i ~/.ssh/id_ed25519.pub user@server
+chmod 600 ~/.ssh/id_ed25519
+chmod 644 ~/.ssh/id_ed25519.pub
+chmod 600 ~/.ssh/authorized_keys
 
-# ---- hardening (in sshd_config, then RESTART) ----
+# Server-side hardening in /etc/ssh/sshd_config
 PermitRootLogin no
 Port 5152
-AllowUsers  user1 user2
-DenyUsers   user1 user2
-AllowUsers  *@192.168.1.39
-DenyUsers   *@192.168.1.0/24
+AllowUsers user1 user2
 AllowGroups sshusers
 ```
 
 ---
 
-## Part 11 — Self-check questions
+## 13. Common mistakes aur safety points
 
-1. What does SSH stand for and what does it enable?
-2. What is the practical reason for SSHing into your own VM?
-3. Define encryption. What are the two types?
-4. Walk through asymmetric encryption between two users. Which key decrypts?
-5. Explain the lock-and-key analogy. Why is asymmetric more secure for exchange?
-6. Which package must be installed? Give both ways to start the service.
-7. Which VM adapter mode is required, and why?
-8. Difference between `ssh_config` and `sshd_config`. What does the `d` mean?
-9. Give the syntax for SSHing in, and two commands to confirm where you landed.
-10. How do you run a remote command without logging in? Give a use case.
-11. Write an `scp` command. What are the two details people get wrong?
-12. What real-world scenario motivates passwordless authentication?
-13. What permission must `~/.ssh` have? What happens otherwise?
-14. What does `ssh-keygen` produce? Which file must never be shared?
-15. Argue both sides of setting a passphrase on your private key.
-16. What does `ssh-copy-id` do, and which file does it create on the server?
-17. Distinguish `id_rsa`, `id_rsa.pub`, `authorized_keys` and `known_hosts` — which machine holds each?
-18. Why does the yes/no prompt appear only on first connection?
-19. Write the directive to block root login. What error does a user then see?
-20. Why change the default port? What flag is then needed? Is this real security?
-21. Write directives to: allow only two users; block a subnet; allow a group.
-22. Why is `AllowGroups` better than listing ten users? Which earlier lecture makes the same argument?
-23. What must you do after every `sshd_config` change?
+1. `ssh_config` aur `sshd_config` ko same samajhna.
+2. SSH server install karke service/listening port verify na karna.
+3. First host-key prompt ko blindly accept karna.
+4. Private key `id_rsa` share/upload kar dena.
+5. `.ssh`/`authorized_keys` permissions too broad rakhna.
+6. Key passphrase na lagana jab private key theft risk high ho.
+7. `scp` remote path mein colon miss karna.
+8. SSH config edit karke `sshd -t` run na karna.
+9. Remote SSH service restart karte waqt alternate access/session na rakhna.
+10. Non-default port ko complete security solution samajhna.
+11. `AllowUsers`/`AllowGroups` ke baad required admin account lock kar dena.
+12. Firewall/network policy update kiye bina port change karna.
+13. Root SSH disable karke normal user + sudo recovery test na karna.
+14. `authorized_keys` mein unknown keys ko ignore karna.
+15. SSH commands ko unauthorized machines par run/test karna.
 
 ---
 
-## Part 12 — The Kali Linux course is complete
+## 14. Self-check questions
 
-**Day 15 concludes the 15-session capsule course.** The arc across all fifteen:
+1. SSH ka full form aur main purpose kya hai?
+2. Remote VM ke liye SSH convenient kyu hai?
+3. Encryption kya hai? Symmetric aur asymmetric encryption compare karo.
+4. Public/private key ka lock analogy explain karo.
+5. `openssh-server` package aur `ssh` service ka relation kya hai?
+6. `ssh_config` aur `sshd_config` mein difference kya hai?
+7. `sshd` mein `d` ka meaning kya hai?
+8. Remote login command aur remote one-command execution command likho.
+9. `scp` syntax mein colon ka role kya hai?
+10. `scp -r` kab use hota hai?
+11. `id_rsa`, public key, `authorized_keys` aur `known_hosts` kaunse machine par hote hain?
+12. `ssh-copy-id` kya karta hai?
+13. `.ssh` aur `authorized_keys` ki permissions strict kyu honi chahiye?
+14. `PermitRootLogin no` ka effect kya hai?
+15. SSH port change security ka complete solution kyu nahi?
+16. `AllowUsers`, `DenyUsers` aur `AllowGroups` ka purpose compare karo.
+17. `sshd -t` restart se pehle kyu run karna chahiye?
+18. SSH hardening ke liye firewall, keys, groups aur logging ka role kya hai?
+19. Remote config change mein lockout avoid karne ke liye workflow kya hoga?
+20. Public SSH server par authorized keys audit kyu zaruri hai?
 
-| Days | Theme |
+---
+
+## 15. Kali Linux capsule course ka conclusion
+
+15-session course ka progression:
+
+| Sessions | Main theme |
 |---|---|
-| **1–2** | Linux history, filesystem hierarchy, basic commands |
-| **3–6** | I/O redirection, file descriptors, text processing (`sed`, `grep`, `awk`, `cut`), compression |
-| **7–8** | Users, groups, `sudo`, password management |
-| **9–10** | File permissions, `umask`, SUID/SGID/sticky, `find` |
-| **11–14** | `vi`, packages, variables, globbing, `history`, root recovery |
-| **15** | **SSH, encryption, remote access, hardening** |
+| Days 1–2 | Linux history, filesystem hierarchy, basic commands |
+| Days 3–6 | Redirection, pipelines, `sed`, `grep`, `awk`, `cut`, compression |
+| Days 7–8 | Users, groups, sudo, password management |
+| Days 9–10 | Standard/advanced file security and `find` |
+| Days 11–14 | `vi`, packages, variables, globbing, history, `sort`, `uniq` |
+| Day 15 | SSH, encryption, remote access and hardening |
 
-### The trainer's closing note
+Trainer learners se feedback, comments aur reports continue karne ko kehte hain. Course ka next roadmap OSINT series hai, jiske Day 1 ka transcript number 015 hai.
 
-> *"I gave 100% from my side, as much as I could give you in 15 days."*
->
-> And an open invitation to criticism: *"If you feel that I did not teach you properly, or left gaps in concept delivery — for that we are really sorry."*
+---
 
-### The standing request
+## 16. Final takeaway
 
-> **"Whether you are watching this after 10 days, after a month, or even after 1 YEAR — please go to the LinkedIn page for that video and comment whether you understood or not."**
->
-> *"You will benefit not just yourself but other people too, because they will come to know that there is genuinely something to learn here. And if you did NOT get to learn, then please tell that too."*
+- SSH encrypted remote shell aur secure file-transfer workflow provide karta hai.
+- Key-based authentication mein public key share hoti hai, private key protected rehti hai.
+- `ssh_config` client aur `sshd_config` server behavior control karte hain.
+- `scp` remote files transfer karta hai; destination syntax mein colon important hai.
+- Root login disable, allowed users/groups, key protection, firewall aur logging SSH hardening ke layers hain.
+- Non-default port sirf noise reduction hai, complete defense nahi.
+- Configuration validate karke hi service restart karo aur remote lockout se bachne ke liye alternate access rakho.
+- SSH aur permissions ko Day 7–10 ke user/group/privilege concepts ke saath connect karke samjho.
 
-### What comes next
-
-The **OSINT course** (transcript 015 onward) is already running, and forms **stage two** of the stated roadmap: **Linux → OSINT → Penetration Testing.**
+Kali Linux fundamentals ka ye final session OSINT aur future penetration-testing learning ke liye remote-access foundation complete karta hai.
