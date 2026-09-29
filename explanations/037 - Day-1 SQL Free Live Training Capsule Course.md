@@ -1,89 +1,258 @@
-# Explanation — 037 — Day 1: SQL (Data → DBMS → RDBMS, SQL's command families)
+# SQL Day 1 — Data, Database, DBMS, RDBMS aur SQL Command Families (Hinglish Explanation)
 
-**Source:** `transcripts/037 - Day-1 SQL Free Live Training Capsule Course [ Hindi ].hi-orig.srt`
-**Translation:** `english/037 - Day-1 SQL Free Live Training Capsule Course.md`
-**Level:** Absolute-beginner SQL, **security-framed** — same trainer (Hardik) and same live-capsule format as the Python capsule (029–035). Day 1 is ~95% theory by design; hands-on querying starts next class.
+**Source transcript:** `transcripts/037 - Day-1 SQL Free Live Training Capsule Course [ Hindi ].hi-orig.srt`
+**Trainer in transcript:** Hardik Ashirwad
+**Builds on:** Python Days 1–7 — programming/automation foundation
+**Course context:** Naya SQL capsule; SQL Days 1–9 transcripts 037–043 and 045–046 mein interleaved hain.
+**Note:** Ye exact matching Hindi transcript ko context ke saath samajh kar likha gaya hai; ye literal translation nahi hai. SQL injection discussion conceptual/defensive hai; real login/database par payload test mat karo.
 
 ---
 
-## 0. What this class is
+## 1. Day 1 ka concept ladder
 
-The SQL capsule's foundation day: the concept ladder **data → database → DBMS → RDBMS**, a live **Oracle 10g** install, and the four SQL command families (**DDL / DML / DCL / TCL**) — all framed around the capsule's destination: **SQL injection** (promised as a live lab in the final class). No SQL statements are yet run; the only practical work assigned is installing Oracle and posting a "Connected" screenshot.
+Aaj mostly theory hai. Sequence:
 
-## 1. The concept ladder (each rung defined by the one below it)
-
-1. **Data** = the **raw form of information**. Information is the extracted, *useful* part; data is everything lying around it can be extracted from. (His domestic image: the house is full of things; only the useful ones count as "your data.")
-2. **Database** = a collection of data (the bookshelf full of books).
-3. **DBMS (Database Management System)** = the *system* that manages the database — how items are arranged, found, retrieved (his model: a library as books-management-made-system). It replaced the older **file-based** storage, whose failure mode he lists: opening many files by hand to locate one fact, plus the where/how/arrangement headaches.
-4. **Tabular model:** modern DBMSs structure data as **tables** = **columns** (kinds of data) × **rows** (one record each). The college-result-table analogy: find your row, read across. (He even nods to the *3 Idiots* result scene.)
-5. **SQL (Structured Query Language)** = the *language* created to manage/query that table-world. A single run instruction is a **query**; the query returns data out of tables. Crucial distinction he draws: **SQL ≠ DBMS** — SQL is the language spoken *to* the system; the DBMS is the whole system.
-6. **RDBMS (Relational DBMS)** = DBMS where tables can be **related** to each other. His two-table example encodes a real **foreign-key-style constraint**: the students-table accepts a `course` value **only if** that course exists in the courses-table — the insert-time check *is* the relationship. RDBMS is the current mainstream; older lineage: file systems → DBMS → RDBMS.
-7. **Deliberately out of scope:** **normalization** (1NF/2NF…) — flagged as too deep for this capsule's level.
-
-## 2. The why — the cyber-security framing (the class's real payload)
-
-A login form sketch delivers the whole argument:
-
-- A website's login posts **username + password**; the backend runs an SQL **query** asking "does this pair exist in the users table?"; match → logged in, no match → nothing.
-- If an attacker can smuggle **malicious SQL into that query** so the database **behaves abnormally**, that's **SQL injection**. The canonical shape of the payload — a condition that is **always true** — is shown by name: **`1 = 1`** (`OR 1=1`-style tautology) → login granted as admin.
-- Consequence chain he traces: injection → database **dump** → credential lists — and connects it to **cracking** workflows: use **dorks** to find small vulnerable sites → inject → dump DB → **credential-stuff** the same username/password combos everywhere else. With the explicit warning: **cracking is completely illegal — don't try it.**
-- The paired doctrine (verbatim-logic): in security you learn to **break *and* fix** — you can't sanitize against injection you don't understand; "doing a thing isn't important, knowing how it works is." The extended **Maggi** parable: too much salt ruins the noodles — a cook knows how to *reduce* the salt's effect with the other spices. Break-knowledge is what enables fix-knowledge.
-- The **script-kiddie** warning: someone who only runs tools/commands without knowing what happens in the backend "doesn't know how the thing works — when it breaks, they can't fix it." Depth is the entire point of the capsule.
-- Legitimate career faces of the same knowledge: **DBA** (you own what happens to the data) and **developer** (storing/showing data). He pledges the course reaches **college level**; students can send their college syllabus via Telegram.
-
-## 3. Installation (the day's only practical)
-
-- **Tool: Oracle Database 10g** on **Windows** (link via Telegram / video description; explicitly **not Android**; no Mac guidance). Rationale for choosing a mainstream engine: core **queries run everywhere**; engines differ in small ways (Oracle: slightly different data types, has **PL/SQL**; MySQL: the "normal" one, everywhere nowadays).
-- Install walk: download → run installer → accept terms → **next/next** → set **password** — with the big caution: **remember this password**, changing it later is painful (write it down).
-- **Connecting:** Start menu → Oracle's **SQL command line** → enter credentials (`system` + password) → success shows **Connected**. Side notes: install can feel slow (the engine stands up local server pieces, databases, its own **port** in the background); heaviness ends after install.
-- **Homework/task:** install, get "Connected," post the **screenshot in the video comments** (ID/password may be hidden); problems → Telegram (tag an admin).
-
-## 4. SQL's four command families (the day's core theory)
-
-He frames the families as: *what kinds of meddling can be done with data* — the extras/extensions all live inside these mains.
-
-| Family | Full name | Scope ("whose business") | Commands he names | His teaching image |
-|---|---|---|---|---|
-| **DDL** | Data **Definition** Language | the **schema** — table structure: how many columns, what each column holds (number/string/date…) | **CREATE · ALTER · DROP** | "DDL uncle" dictates the structure; humans err → ALTER fixes schema mistakes; DROP = the (joked-about) rage-quit "drop everything on your last day" — **with an explicit never-do-this warning**; real use = genuinely retiring unneeded tables |
-| **DML** | Data **Manipulation** Language | the **data rows inside** the table | **SELECT · INSERT · UPDATE · DELETE** | profile edits as the everyday example (a user changing their own name/email = an UPDATE); **warns**: textbooks often split SELECT off separately — he'll own the correction next class if needed |
-| **DCL** | Data **Control** Language | **permissions** — who may do what | **GRANT · REVOKE** | king-and-pawns model: admin = king; junior devs/services = pawns; a website typically gets insert-only rights ("you can put data in, not delete it"); REVOKE = snatching misused powers back (the mother image) |
-| **TCL** | **Transaction** Control Language | making changes **final / undoable**; production-grade | **COMMIT · ROLLBACK** | commit ≈ git commit (finalize globally; no going back) → rollback = return to the previous state. Living example: **UPI payment at a shop** — stuck "processing," failed transfer, or debited-but-not-received → system rolls back; refund lands within ~30 days |
-
-**DDL-vs-DML confusion is explicitly banned** (his words): DDL touches the table's *scheme*; DML touches the *data inside* it.
-
-## 5. Course logistics stated in this session
-
-- **No fixed commitment** on series length (no "7 days / 20 days"); it scales with audience support and demanded topics; big standalone topics may get dedicated videos.
-- Sessions stay short for now; depth ramps when DML starts — "**for SELECT alone we'll spend one-two full days**."
-- Feedback loop: Telegram (links, troubleshooting — tag any admin), comments (homework screenshots), session reviews; he even asks for mic purchase advice (₹5000 budget) after the class's audio issues.
-
-## 6. Concept map
-
-```
-DATA      : raw form of information → extract the useful part
-DATABASE  : organized collection (bookshelf)
-DBMS      : the system managing the database (library) — replaces ad-hoc FILES
-TABLE     : columns (kinds) × rows (records) — the college result sheet
-SQL       : Structured Query Language — queries run against tables;  SQL ≠ DBMS
-RDBMS     : tables RELATED to tables (insert-time course check ≈ foreign-key idea)
-            lineage: files → DBMS → RDBMS (today's mainstream); normalization deferred
-WHY SECURITY CARES
-  login → backend query → smuggled always-TRUE condition (1=1) ⇒ SQL INJECTION
-  injection → DB dump → credential lists → cracking/credential-stuffing (ILLEGAL — warned)
-  doctrine: learn to break ⇄ learn to fix; concepts > tools (anti script-kiddie)
-COMMAND FAMILIES
-  DDL (schema): CREATE ALTER DROP     — "DDL uncle"; don't rage-DROP on exit
-  DML (rows)  : SELECT INSERT UPDATE DELETE — the profile-edit everyday case
-  DCL (rights): GRANT REVOKE          — king/pawns; website gets insert-only
-  TCL (finality): COMMIT ROLLBACK     — git-like; the UPI-payment rollback story
+```text
+Data -> Database -> DBMS -> Table -> SQL -> RDBMS
 ```
 
-## 7. Self-check prompts
+### 1.1 Data
 
-1. Place these in a sentence each such that each defines the next: data, database, DBMS, SQL, RDBMS.
-2. Two tables: `courses` and `students`. Describe the insert-time check that makes their relationship "relational."
-3. Trace a website login to its SQL query; now describe what an always-true injected condition (1=1) changes, and name the attack.
-4. Sort these commands into families and *state the scope of each family*: COMMIT, DROP, REVOKE, UPDATE, ALTER, GRANT, SELECT, ROLLBACK, INSERT, CREATE.
-5. Recite the DDL-vs-DML rule in one line each ("DDL uncle owns ___; DML uncle owns ___").
-6. Re-tell the shop/UPI story as a COMMIT/ROLLBACK narrative: which events trigger a rollback, and why does that protect the user?
-7. What made file-based data handling painful enough to invent the DBMS? Why is SQL not the same thing as the DBMS?
+Data = raw form of information. Raw values ko process/extract karke useful information milti hai.
+
+### 1.2 Database
+
+Database organized collection of data hai—bookshelf analogy. Data ko store/retrieve/manage karna possible hota hai.
+
+### 1.3 DBMS
+
+DBMS = Database Management System; data ko arrange, search, retrieve, update aur control karne wala system.
+
+Old file-based approach mein one fact dhoondhne ke liye many files manually open karne padte. DBMS structure, query and access control provide karta hai.
+
+### 1.4 Tables
+
+Relational databases data ko tables mein represent karte hain:
+
+- columns = attributes/fields,
+- rows = records.
+
+```text
+students table:
+student_id | name | course_id
+```
+
+### 1.5 SQL
+
+SQL = Structured Query Language. SQL database/DBMS se baat karne ki language hai.
+
+Important:
+
+```text
+SQL != DBMS
+```
+
+SQL instructions/query language hai; Oracle/MySQL/PostgreSQL DBMS/RDBMS products hain.
+
+### 1.6 RDBMS
+
+RDBMS = Relational Database Management System. Multiple tables relationships ke through connected hote hain, usually keys/foreign keys se.
+
+Example:
+
+```text
+courses(course_id, course_name)
+students(student_id, name, course_id)
+```
+
+Student ka `course_id` valid course table mein exist karna chahiye. Ye relational integrity ka basic idea hai.
+
+Normalization (1NF/2NF etc.) ko transcript deeper topic ke roop mein defer karta hai.
+
+---
+
+## 2. Cybersecurity mein SQL kyu?
+
+Website login form username/password backend query ke through database se match kar sakta hai:
+
+```text
+input -> backend query -> users table -> match/no match
+```
+
+Agar application user input ko safely parameterize nahi karti aur attacker query logic alter kar de, to **SQL injection** vulnerability ho sakti hai.
+
+Transcript always-true `1=1`/`OR 1=1` style tautology ka conceptual mention karta hai. Isko lab ke bahar try nahi karna.
+
+### 2.1 Attack impact
+
+Poorly protected SQL injection se:
+
+- authentication bypass,
+- data disclosure/dump,
+- data modification/deletion,
+- credential exposure
+ho sakta hai.
+
+Credential stuffing/cracking illegal misuse hai. Defensive developer controls:
+
+- parameterized queries/prepared statements,
+- input validation (secondary control),
+- least-privilege DB account,
+- safe error messages,
+- logging/monitoring,
+- patching and security tests in authorized staging.
+
+### 2.2 Break and fix doctrine
+
+Security professional ko vulnerability mechanism samajhna chahiye taaki fix validate kar sake. Tool blindly run karna script-kiddie behavior hai. “Break” knowledge ko only permissioned lab/defensive assessment mein apply karo.
+
+---
+
+## 3. Oracle installation practical
+
+Transcript Windows par **Oracle Database 10g** installation demo karta hai:
+
+1. Official/course-provided installer source.
+2. Install/terms/next steps.
+3. Database/system password set.
+4. Password securely store—forget karoge to recovery difficult.
+5. Start menu se Oracle SQL command line.
+6. `system` user/password se connect.
+7. Successful message: `Connected`.
+
+SQL*Plus-style connection concept:
+
+```text
+username: system
+password: <lab password>
+```
+
+### 3.1 Safety
+
+- Course/lab database only.
+- Default/admin account ko production application se use mat karo.
+- Password screenshot/LinkedIn comment mein hide.
+- Oracle 10g old software hai; production use nahi; isolated lab/network only.
+- Database port firewall/VM network par restrict.
+
+SQL syntax broadly portable ho sakti hai, but Oracle/MySQL/PostgreSQL data types/functions differ.
+
+---
+
+## 4. SQL command families
+
+### DDL — Data Definition Language
+
+Schema/table structure:
+
+```text
+CREATE, ALTER, DROP
+```
+
+- `CREATE` table/object banata.
+- `ALTER` structure change.
+- `DROP` object remove—destructive, carefully use.
+
+### DML — Data Manipulation Language
+
+Rows/data:
+
+```text
+SELECT, INSERT, UPDATE, DELETE
+```
+
+Some textbooks `SELECT` ko DQL separate bolte hain; transcript DML family mein include karta hai. Team/course convention document karo.
+
+### DCL — Data Control Language
+
+Permissions:
+
+```text
+GRANT, REVOKE
+```
+
+Website DB user ko only required permission dena least privilege principle hai. Insert-only account ko DROP/DELETE rights nahi hone chahiye.
+
+### TCL — Transaction Control Language
+
+Changes finalize/undo:
+
+```text
+COMMIT, ROLLBACK
+```
+
+UPI/payment analogy:
+
+- success → commit/finalize,
+- failed/incomplete transfer → rollback/consistent state.
+
+`COMMIT` ke baad rollback ability/database engine behavior transaction context par depend karta hai; production destructive operation se pehle backup/change review mandatory.
+
+---
+
+## 5. DDL vs DML quick rule
+
+```text
+DDL = table/schema ka design
+DML = table ke andar rows/data
+DCL = who can do what
+TCL = changes final/undo
+```
+
+Example:
+
+```text
+CREATE TABLE -> DDL
+INSERT row -> DML
+GRANT SELECT -> DCL
+ROLLBACK -> TCL
+```
+
+---
+
+## 6. Course logistics aur homework
+
+- Oracle install.
+- SQL command line se `Connected` verify.
+- Screenshot approved course comment mein submit, password redact.
+- Questions/problem Telegram/admin route par.
+- Next classes DDL/DML practical queries cover karengi; `SELECT` par full sessions planned.
+
+---
+
+## 7. Common mistakes aur corrections
+
+1. Data, database, DBMS aur SQL ko same samajhna.
+2. SQL ko database product samajhna.
+3. RDBMS relationship ko only visual table connection samajhna.
+4. SQL injection payload real login par test karna.
+5. Admin/system account ko application mein use karna.
+6. Oracle 10g ko current production secure DB samajhna.
+7. DDL/DML/DCL/TCL family mix karna.
+8. `DROP`/`DELETE` ko casually run karna.
+9. Password screenshot mein expose karna.
+10. `COMMIT`/`ROLLBACK` ko payment guarantee samajhna.
+11. Engine-specific syntax difference ignore karna.
+
+---
+
+## 8. Day 1 self-check questions
+
+1. Data aur information ka difference kya hai?
+2. Database aur DBMS compare karo.
+3. Table mein row aur column kya represent karte hain?
+4. SQL aur RDBMS same kyu nahi?
+5. Foreign-key style relationship ka student/course example do.
+6. Login flow mein SQL injection vulnerability conceptually kaise arise hoti hai?
+7. SQL injection ke defensive controls kya hain?
+8. DDL, DML, DCL aur TCL ke commands classify karo.
+9. `DROP` aur `DELETE` ke destructive risks kya hain?
+10. Least privilege database account kyu important hai?
+11. Oracle lab password ko kaise protect karoge?
+12. Commit/rollback ko transaction example se explain karo.
+
+---
+
+## 9. Continuity
+
+Python project ke baad SQL data/database concepts aate hain. Day 2 mein data types, `CREATE TABLE`, constraints aur error reading; Day 3 se insert/select/alter/drop practical queries shuru hongi. Network Security Day 1 ke IP/ports concepts se future database service exposure samjha ja sakega.
