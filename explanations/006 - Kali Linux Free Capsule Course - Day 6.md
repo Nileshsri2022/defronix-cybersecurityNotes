@@ -1,360 +1,535 @@
-# Explanation — Day 6: `cut`, `awk` & Compression
+# Day 6 — Kali Linux Capsule Course: `cut`, `awk`, Compression & `tar` (Hinglish Explanation)
 
-**Lecture:** 006 — Kali Linux Free Capsule Course, Day 6
-**Translation:** [`english/006 - Kali Linux Free Capsule Course - Day 6.md`](../english/006%20-%20Kali%20Linux%20Free%20Capsule%20Course%20-%20Day%206.md)
-**Builds on:** Day 5 (`grep`, `sed`)
-
----
-
-## 0. Course roadmap announced
-
-The trainer checks whether learners are getting bored of back-to-back command sessions and lays out the plan:
-
-| Coming up | Topic |
-|---|---|
-| Day 7 | **User Management** |
-| Then | **Group Management** |
-| Then | **File Security & Permissions** |
-| After that | **Back to the remaining commands** |
-
-The pause is deliberate — it gives learners time to revise and practise the commands covered so far.
-
-> Rationale repeated throughout: **every command has its own role.** A command is useful up to a point, then hits its **limitations**, and the next command takes over. Day 6 is a live demonstration of exactly that — `cut` hits a wall, and `awk` steps in.
+**Source transcript:** `transcripts/006 - Kali Linux Free Capsule Course - Day 6 [ Hindi ].hi-orig.srt`  
+**Note:** Ye explanation Hindi original transcript ko samajh kar easy Hinglish mein banaya gaya hai. Auto-captions mein `कट/बट` = `cut`, `ए ब्लू के/अब` = `awk`, `डिल्ली मी/दिल्ली मी` = delimiter, `जड़ कैट` = `zcat`, `बी स कैट` = `bzcat`, `गिफ्ट/टावर` = `tar` jaise garbled words mile; unka intended technical meaning restore karke explain kiya gaya hai.
 
 ---
 
-## Part 1 — `cut`
+## 1. Day 6 ka focus
 
-> **`cut` is used to cut records using characters and fields, from any file or from any command output.**
+Trainer pehle students se poochte hain ki har session mein sirf commands chal rahi hain, topic change karna chahiye ya continue. Phir announce karte hain ki aaj commands continue hongi aur agle sessions mein **user management**, **group management**, **file security**, aur **permissions** aayenge. Aaj ke major topics:
 
-### 1.1 Syntax
+1. **`cut`** — file ya command output se characters/fields cut karke sirf required data nikaalna.
+2. **`awk`** — space-separated output ko smartly fields mein todkar formatted output banana.
+3. **`gzip` / `gunzip`**, **`bzip2` / `bunzip2`** — file compress/decompress aur compressed file ka content dekhna.
+4. **`tar`** — multiple files ko ek archive mein bundle karna, `.tar`, `.tar.gz`, `.tar.bz2` create/extract/list karna.
 
-```bash
-cut [options] filename
-command | cut [options]
-```
-
-### 1.2 The three flags
-
-| Flag | Meaning |
-|---|---|
-| `-c` | cut by **character** |
-| `-f` | cut by **field** |
-| `-d` | define the **delimiter** |
-
-### 1.3 Cutting by character — `-c`
-
-```bash
-cut -c1-6 file        # characters 1 through 6
-cut -c1,3 file        # only characters 1 and 3 (comma = specific picks)
-```
-
-| Syntax | Meaning |
-|---|---|
-| `-c1-6` | a **range** of characters |
-| `-c1,3` | **specific** characters |
-
-In the demo, `manish` = 6 characters, so `-c1-6` captures the whole name; `-c1,3` returns just `m` and `n`.
-
-### 1.4 Cutting by field — `-f` needs `-d`
-
-**The critical rule:**
-
-> **Without a delimiter, `cut -f` cannot work.** With no delimiter defined, `cut` treats the *entire line* as one single field — so `-f1` just prints everything.
-
-```bash
-cut -f1 file                   # prints the WHOLE line — not what you wanted
-cut -d':' -f1 /etc/passwd      # correct: colon-delimited, first field
-cut -d':' -f1,3 /etc/passwd    # fields 1 and 3
-```
-
-### 1.5 What a delimiter actually is
-
-A **delimiter is a symbol you nominate as the field boundary**. It can be anything — colon, comma, semicolon, `$`, `@`, space.
-
-For `/etc/passwd`, entries look like `name:x:1000:1000::/home/name:/bin/bash`. Declaring `:` as the delimiter means:
-
-```
-manish  :  x  :  1001  :  1001  :     :  /home/manish  :  /bin/bash
-  f1       f2    f3      f4      f5        f6              f7
-```
-
-Note that **empty fields still count** — field 5 above is blank but occupies a position.
-
-### 1.6 Real use case — log extraction
-
-```bash
-tail /var/log/messages | cut -d' ' -f1,2
-```
-
-Pulls the **month, date, time** and **username** out of log lines — exactly the kind of extract you'd forward to someone who asks for "the latest entries with usernames."
-
-### 1.7 Where `cut` breaks down ⚠
-
-`cut -d' '` splits on a **single space**. Command output such as `df -h` or `ifconfig` is aligned with **variable numbers of spaces**, so:
-
-- Field positions shift line to line
-- Runs of spaces create empty fields
-- You cannot construct a reliable delimiter
-
-> **This is `cut`'s limitation — and precisely why `awk` exists.**
+Trainer bolte hain: Linux admin ke liye ye commands bahut important hain kyunki har command ka apna role hota hai. Ek command apni limitation tak kaam karti hai, phir dusri command usko take over kar leti hai. Isi chain mein `cut`, `awk`, compression tools, aur `tar` practical workflow complete karte hain.
 
 ---
 
-## Part 2 — `awk`
+## 2. `cut` command — kaam kya hai?
 
-> Described in class as **the most important command in shell scripting.**
+`cut` ka kaam hota hai file ya kisi command ke output se:
 
-### 2.1 The key advantage
+- characters cut karna — jaise position 1 se 6, ya position 1 aur 3
+- fields cut karna — delimiter ke basis par field 1, field 3, etc.
 
-**`awk` handles whitespace automatically.** You don't define a space delimiter — it counts and adjusts by itself, regardless of how many spaces separate the columns.
+Do common syntax styles:
 
-### 2.2 Syntax
+```bash
+cut OPTION file
+command | cut OPTION
+```
+
+Example idea:
+
+```bash
+cat sample.txt
+tail -n 2 sample.txt | cut ...
+df -h | cut ...
+```
+
+Yani `cut` kamal ka tab hota hai jab poora output nahi, sirf uska selected hissa chahiye.
+
+---
+
+## 3. `cut -c` — character positions se kaatna
+
+`-c` ka matlab: **cut by characters**.
+
+### Ek character
+
+```bash
+cut -c1 sample.txt
+```
+
+Isse har line ka 1st character milega.
+
+### Continuous range
+
+```bash
+cut -c1-6 sample.txt
+```
+
+Isse har line ke 1st se 6th character tak text milega. Agar line mein `manish` type naam ho aur aap sirf pehle 6 chars chahte ho, ye approach kaam aayega.
+
+### Multiple non-continuous positions
+
+```bash
+cut -c1,3 sample.txt
+```
+
+Isse har line se 1st aur 3rd character milega.
+
+### Pipe ke saath
+
+```bash
+tail -n 2 sample.txt | cut -c1-6
+```
+
+Iska flow:
+
+```text
+tail → last 2 lines
+cut -c1-6 → har line ke pehle 6 chars
+```
+
+Trainer ne is phase mein `grep -w` se combine karke bhi dikhaya: pehle exact line filter karo, phir us line se selected chars nikaal lo.
+
+---
+
+## 4. `cut -d` aur `-f` — delimiter ke sath fields
+
+Field ka matlab: line ka ek logical column. Lekin `cut` ko tabhi field samajh aayega jab aap delimiter bataoge.
+
+- `-d` = delimiter define karo
+- `-f` = field number select karo
+
+Example `/etc/passwd` style file colon `:` se fields rakhti hai:
+
+```bash
+cut -d ':' -f1 /etc/passwd
+```
+
+Isse field 1 — mostly username — milega.
+
+Agar field 1 aur 3 dono chahiye:
+
+```bash
+cut -d ':' -f1,3 /etc/passwd
+```
+
+Agar field 1 se 3 tak chahiye:
+
+```bash
+cut -d ':' -f1-3 /etc/passwd
+```
+
+Without delimiter sirf `-f1` likhne par `cut` many cases mein poori line ko ek field samajh lega ya expected output nahi dega. Isliye `-d` aur `-f` ko sath sochna chahiye.
+
+### Delimiter koi bhi symbol ho sakta hai
+
+Comma, colon, semicolon, space, `@` — jo data mein field separator hai, wahi delimiter bana sakte ho. Space delimiter ka example:
+
+```bash
+tail -n 5 /var/log/messages | cut -d ' ' -f1,2,3
+```
+
+Isse log entry ka month/date/time jaise starting fields mil sakte hain — exact field number log format par depend karta hai.
+
+---
+
+## 5. `cut` ki limitation — multiple/irregular spaces
+
+Trainer ne limitation dikhayi: agar output mein ek se zyada spaces hain, simple `cut -d ' ' -fN` confuse ho sakta hai. Kyunki `cut` har exact delimiter occurrence ko count karta hai; extra spaces ke bich empty fields ban sakte hain.
+
+Example concept:
+
+```bash
+df -h | cut -d ' ' -f1
+```
+
+Shayad kaam kar jaye ya na kare — output alignment ke multiple spaces ki wajah se fields galat aa sakte hain. Aise case mein `awk` better hota hai kyunki `awk` whitespace ko intelligently handle kar leta hai.
+
+---
+
+## 6. `awk` — `cut` ki limitation ka practical solution
+
+`awk` shell scripting ki bahut important command hai. Is class mein basic field extraction use hui:
 
 ```bash
 command | awk '{print $1}'
 ```
 
-Structure: single quotes → curly braces → `print` → `$n` field references.
+Yahan:
 
-| Element | Purpose |
-|---|---|
-| `'...'` | wraps the awk program |
-| `{ }` | the action block |
-| `print` | output instruction |
-| `$1`, `$2`… | field number |
-| `$0` | the whole line |
+- `$1` = first field
+- `$2` = second field
+- `$6` = sixth field
 
-### 2.3 Examples
+`awk` by default spaces/tabs ko field separator maan leta hai, aur multiple consecutive spaces ko sensible tarike se handle karta hai.
 
-```bash
-df -h | awk '{print $1}'              # first column (filesystem)
-df -h | awk '{print $2}'              # second column (size)
-df -h | awk '{print $1,$2,$6}'        # filesystem, size, mount point
-```
+### `df -h` se selected columns
 
-Comparison with `cut` on the same task:
-
-| | `cut` | `awk` |
-|---|---|---|
-| Whitespace handling | manual, fragile | **automatic** |
-| Variable spacing | breaks | works |
-| Syntax for field 2 | `-d' ' -f2` (unreliable) | `'{print $2}'` |
-
-### 2.4 Custom field separator — `-F`
-
-When the separator is **not** whitespace, declare it with **capital `-F`**:
+Disk usage output dekho:
 
 ```bash
-ifconfig | grep inet | awk -F':' '{print $2}'
+df -h
 ```
 
-| Flag | Use |
-|---|---|
-| (none) | split on whitespace — the default |
-| `-F':'` | split on a colon |
-| `-F','` | split on a comma |
-
-### 2.5 Chaining it all together
+Agar sirf filesystem chahiye:
 
 ```bash
-ifconfig | grep inet | awk '{print $2}'
+df -h | awk '{print $1}'
 ```
 
-This is the three-step admin workflow from Day 4 in action: one command's output narrowed by `grep`, then sliced by `awk`.
+Agar filesystem + size + mounted-on chahiye:
 
-### 2.6 `column -t` — tidy output
+```bash
+df -h | awk '{print $1,$2,$6}'
+```
 
-When cut/awk output arrives merged or misaligned, pipe it through `column`:
+Output ko table jaisa clean dikhane ke liye:
 
 ```bash
 df -h | awk '{print $1,$2,$6}' | column -t
 ```
 
-| Flag | Meaning |
-|---|---|
-| `-t` | create a **table** — arrange output in aligned columns |
-
-> **General tip restated:** whenever a command or flag is unclear, run `command --help`. Everything is documented there in detail.
-
----
-
-## Part 3 — Practice question set in class
-
-> Using `df -h | awk ...`, the output `25%` was produced.
->
-> **Task: modify the command so the output is `25` only — without the `%` sign.**
->
-> Answers, with a screenshot, to be posted in the video comments.
-
-*(Hint: you already know two tools that can strip a character — one substitutes, one cuts.)*
-
----
-
-## Part 4 — Compression
-
-### 4.1 Why compress?
-
-Two real motivations given:
-
-1. **Sharing** — a file is too large to send; compress it first.
-2. **Archival** — files not used in a long time but **important enough that they cannot be deleted**. Compress them to reclaim space.
-
-### 4.2 `gzip` family — `.gz`
+`column -t` ka kaam: output ko columns/table form mein arrange karna. Help chahiye to:
 
 ```bash
-gzip demo.txt          # compress   -> demo.txt.gz
-zcat demo.txt.gz       # view contents WITHOUT decompressing
-gunzip demo.txt.gz     # decompress -> demo.txt
-```
-
-### 4.3 `bzip2` family — `.bz2`
-
-```bash
-bzip2 demo.txt         # compress   -> demo.txt.bz2
-bzcat demo.txt.bz2     # view contents
-bunzip2 demo.txt.bz2   # decompress
-```
-
-`bzip2` generally achieves better compression, though **on a small file you will not see much difference.**
-
-### 4.4 The families do not mix ⚠
-
-| Extension | View | Decompress |
-|---|---|---|
-| `.gz` | `zcat` | `gunzip` |
-| `.bz2` | `bzcat` | `bunzip2` |
-
-> You **cannot** use `gunzip` on a `.bz2` file, or `zcat` on it. Each format has its own matching tool. Plain `cat` works on neither.
-
-### 4.5 The limitation of both
-
-`gzip` and `bzip2` compress **one file at a time**. They cannot bundle 10, 15 or 20 files into a single archive.
-
-**That is what `tar` is for.**
-
----
-
-## Part 5 — `tar`
-
-### 5.1 The flags
-
-| Flag | Meaning |
-|---|---|
-| `-c` | **create** an archive |
-| `-x` | e**x**tract an archive |
-| `-t` | **list** contents |
-| `-v` | **verbose** — show progress on screen |
-| `-f` | **file** — the archive's name (must come last among these) |
-| `-z` | also compress with **gzip** |
-| `-j` | also compress with **bzip2** |
-
-### 5.2 Creating archives
-
-```bash
-tar -cvf practice.tar demo.txt sample.txt        # plain archive
-tar -czvf practice.tar.gz demo.txt test.txt      # archive + gzip
-tar -cjvf practice.tar.bz2 demo.txt test.txt     # archive + bzip2
-```
-
-> **Ordering rule hit during the demo:** the `z` (or `j`) option must come **before** `f`. Putting it after produces a syntax error.
-
-### 5.3 Listing before extracting
-
-```bash
-tar -tvf practice.tar                # list everything inside
-tar -tvf practice.tar demo1.txt      # check for one specific file
-```
-
-If the file isn't present you get `not found in archive` followed by `error exit delayed from previous errors`.
-
-> Good practice: **list before you extract**, so you know what will land in your directory.
-
-### 5.4 Extracting
-
-```bash
-tar -xvf practice.tar
-tar -xzvf practice.tar.gz
-tar -xjvf practice.tar.bz2
-```
-
-### 5.5 Why `tar` is the one to actually memorise
-
-The trainer is emphatic on this point:
-
-> **Even if you are not a Linux admin — if you are a cyber security engineer, this matters just as much.**
-
-- Packages downloaded from repositories or websites arrive in **zipped format**.
-- **Manual installation** requires unpacking them first.
-- If you can't unzip, you can't install or use the tool.
-
-`gzip` / `gunzip` are worth knowing but don't need memorising — reach for them when you want higher compression for sharing. **`tar` is non-negotiable**, because packing and unpacking packages runs through it.
-
----
-
-## Part 6 — Complete cheat sheet
-
-```bash
-# cut
-cut -c1-6 file                  # characters 1-6
-cut -c1,3 file                  # characters 1 and 3
-cut -d':' -f1 /etc/passwd       # field 1, colon-delimited
-cut -d':' -f1,3 /etc/passwd     # fields 1 and 3
-tail /var/log/messages | cut -d' ' -f1,2
-
-# awk
-df -h | awk '{print $1}'               # field 1
-df -h | awk '{print $1,$2,$6}'         # several fields
-awk '{print $0}' file                  # whole line
-ifconfig | grep inet | awk '{print $2}'
-awk -F':' '{print $1}' /etc/passwd     # custom separator
-
-# tidy output
-df -h | awk '{print $1,$2,$6}' | column -t
-
-# gzip family (.gz)
-gzip file / zcat file.gz / gunzip file.gz
-
-# bzip2 family (.bz2)
-bzip2 file / bzcat file.bz2 / bunzip2 file.bz2
-
-# tar
-tar -cvf  archive.tar     f1 f2      # create
-tar -czvf archive.tar.gz  f1 f2      # create + gzip
-tar -cjvf archive.tar.bz2 f1 f2      # create + bzip2
-tar -tvf  archive.tar                # list
-tar -xvf  archive.tar                # extract
-tar -xzvf archive.tar.gz             # extract gzipped
-
-# help
-command --help
 column --help
 ```
 
----
+### Usage percentage
 
-## Part 7 — Self-check questions
+```bash
+df -h | awk '{print $5}'
+```
 
-1. What are the three main flags of `cut` and what does each do?
-2. Difference between `-c1-6` and `-c1,3`.
-3. Why does `cut -f1 file` print the entire line? What's missing?
-4. Define "delimiter". Name four characters that could serve as one.
-5. In `/etc/passwd` with `:` as delimiter, what is field 1? Do empty fields count as fields?
-6. Why does `cut` fail on `df -h` and `ifconfig` output?
-7. What is `awk`'s main advantage over `cut`?
-8. Write the `awk` syntax to print field 2. What does `$0` mean?
-9. When do you need `awk -F`, and what case is the flag?
-10. What does `column -t` do, and why pipe into it?
-11. Two reasons to compress files in a real environment.
-12. Match the tool to the format: `.gz` → view? decompress? `.bz2` → view? decompress?
-13. Why can't `gunzip` handle a `.bz2` file?
-14. What limitation of `gzip`/`bzip2` does `tar` solve?
-15. What do `c`, `x`, `t`, `v`, `f`, `z`, `j` mean in `tar`? Which must come before `f`?
-16. Write commands to: create a gzipped tar of two files; list its contents; extract it.
-17. Why is `tar` described as the most important of the compression commands, even for non-admins?
+Isse `25%` type value milegi. Trainer ne practice question diya: output mein sirf `25` chahiye, `%` nahi. Simple solution Day 5 ke tools se:
+
+```bash
+df -h | awk '{print $5}' | tr -d '%'
+```
+
+Agar sirf root line ho to pehle `grep '/$'` jaisa filter bhi laga sakte ho depending on output.
 
 ---
 
-## Part 8 — Coming up next
+## 7. Real pipeline — network output se IP nikalna
 
-**Day 7 — User Management:** creating and deleting users, creating groups, adding passwords, and setting password expiry dates.
+Trainer ne `ifconfig` jaisa network command use karke dikhaya ki poora output bahut bada hota hai, lekin report/monitoring ke liye sirf IP chahiye hoti hai. Modern systems mein `ip addr` common hai, lekin class flow ke hisaab se `ifconfig` concept samjho:
+
+```bash
+ifconfig | grep -w inet
+```
+
+Phir sirf address field:
+
+```bash
+ifconfig | grep -w inet | awk '{print $2}'
+```
+
+Modern equivalent idea:
+
+```bash
+ip -4 addr show | awk '/inet / {print $2}'
+```
+
+Agar IP ke andar bhi split karna ho, `awk -F` se custom field separator define kar sakte ho:
+
+```bash
+echo '192.168.1.45' | awk -F. '{print $1,$2,$3,$4}'
+```
+
+Agar sirf first three octets ko dotted form mein chahiye:
+
+```bash
+echo '192.168.1.45' | awk -F. '{print $1 "." $2 "." $3}'
+```
+
+Class ka main learning: pehle `grep` se line narrow karo, phir `awk` se desired column nikaalo, phir zarurat ho to `-F` se field ke andar bhi split karo.
+
+---
+
+## 8. Practice flow — kaise combine yaad rakhein
+
+Common chain:
+
+```bash
+source_command | grep FILTER | awk '{print $N}' | column -t
+```
+
+Examples:
+
+```bash
+df -h | awk '{print $1,$2,$5,$6}' | column -t
+cut -d ':' -f1 /etc/passwd | less
+tail -n 10 app.log | grep ERROR | awk '{print $1,$2,$3}'
+```
+
+Regular practice ke liye command ka matlab socho:
+
+- `grep` → kaunsi line chahiye?
+- `cut` → kaunsa fixed character/delimited field chahiye?
+- `awk` → whitespace-separated smart field selection?
+- `column -t` → output clean table?
+
+---
+
+## 9. Compression kyu?
+
+Trainer scenario dete hain:
+
+- File ka size zyada hai aur share karni hai.
+- Kuch important files kaafi time se use nahi ho rahi, lekin delete nahi kar sakte.
+
+Aise case mein compression useful hai. Single text file compress karne ke common tools: `gzip` aur `bzip2`.
+
+---
+
+## 10. `gzip`, `zcat`, `gunzip`
+
+### Compress karna
+
+```bash
+gzip demo.txt
+```
+
+Result: `demo.txt.gz` ban jata hai aur original `demo.txt` normally replace ho jata hai. Size compare karo:
+
+```bash
+ls -lh demo.txt.gz
+```
+
+### Content bina decompress kiye dekhna
+
+```bash
+zcat demo.txt.gz
+```
+
+`zcat` compressed `.gz` file ka content screen par dikhata hai without permanently decompression.
+
+### Decompress karna
+
+```bash
+gunzip demo.txt.gz
+```
+
+Result: `demo.txt` wapas aa jayega aur `.gz` archive normally remove ho jayega.
+
+---
+
+## 11. `bzip2`, `bzcat`, `bzmore`, `bunzip2`
+
+`bzip2` generally better compression deta hai, lekin thoda slower ho sakta hai.
+
+### Compress
+
+```bash
+bzip2 demo.txt
+```
+
+Result: `demo.txt.bz2`.
+
+### Content dekhna
+
+```bash
+bzcat demo.txt.bz2
+```
+
+Page-by-page dekhne ke liye pager style command:
+
+```bash
+bzmore demo.txt.bz2
+```
+
+### Decompress
+
+```bash
+bunzip2 demo.txt.bz2
+```
+
+Important: `.gz` ke liye `gunzip` aur `.bz2` ke liye `bunzip2`. Ek doosre par blindly `gunzip`/`bunzip2` mat chalao; format match important hai.
+
+---
+
+## 12. In compression tools ki limitation
+
+`gzip`/`bzip2` mainly single files compress karte hain. Agar 10, 15, 20 files ko ek archive mein bundle karna ho, in commands se directly ek combined archive banana expected workflow nahi hai.
+
+Is problem ka answer: **`tar`**.
+
+---
+
+## 13. `tar` — multiple files ko ek archive mein
+
+`tar` ka basic create syntax:
+
+```bash
+tar -cvf archive.tar file1 file2 file3
+```
+
+Example class-style:
+
+```bash
+tar -cvf practice.tar demo.txt sample.txt test1.txt
+```
+
+Flags:
+
+- `-c` = create archive
+- `-v` = verbose; screen par kaam dikhata rahe
+- `-f` = file name of archive; `-f` ke turant baad archive ka naam aana chahiye
+
+After create:
+
+```bash
+ls -lh practice.tar
+```
+
+Verbose mein files add hote hue dikhengi.
+
+---
+
+## 14. `.tar.gz` create karna — gzip compression ke saath
+
+```bash
+tar -czvf practice.tar.gz demo.txt sample.txt test1.txt
+```
+
+Extra flag:
+
+- `-z` = gzip compression use karo
+
+Result: bundle + gzip compressed archive.
+
+Order note jo class mein emphasize hua: compression type flag (`z`/`j`) `f` se pehle define ho, aur `f` ke baad archive filename aana chahiye.
+
+---
+
+## 15. `.tar.bz2` create karna — bzip2 compression ke saath
+
+```bash
+tar -cjvf practice.tar.bz2 demo.txt sample.txt test1.txt
+```
+
+Extra flag:
+
+- `-j` = bzip2 compression use karo
+
+Result: `practice.tar.bz2`.
+
+Ye formats isliye important hain kyunki Linux packages/tools aksar `.tar.gz`, `.tgz`, ya `.tar.bz2` mein milte hain. Manual package unpack/install ke liye `tar` aana zaroori hai.
+
+---
+
+## 16. Archive ke andar kya hai? list/search
+
+Archive list karne ke liye:
+
+```bash
+tar -tvf practice.tar
+```
+
+- `-t` = list contents
+
+Compressed archive par bhi same basic idea:
+
+```bash
+tar -tvf practice.tar.gz
+tar -tvf practice.tar.bz2
+```
+
+Specific file check karni ho:
+
+```bash
+tar -tvf practice.tar demo.txt
+```
+
+Ya pipe ke saath search:
+
+```bash
+tar -tvf practice.tar | grep 'demo.txt'
+```
+
+Agar file exist nahi karti, `tar: demo.txt: Not found in archive` type error mil sakta hai.
+
+---
+
+## 17. Archive extract karna
+
+Generic modern style:
+
+```bash
+tar -xvf practice.tar
+tar -xvf practice.tar.gz
+tar -xvf practice.tar.bz2
+```
+
+- `-x` = extract
+
+Older/explicit style:
+
+```bash
+tar -xvzf practice.tar.gz
+tar -xvjf practice.tar.bz2
+```
+
+Modern `tar` aksar format auto-detect kar leta hai, lekin flags samajhna phir bhi useful hai. Extract ke baad `ls -lh` karke files confirm karo.
+
+---
+
+## 18. Command summary table
+
+| Kaam | Command |
+|---|---|
+| 1st char of every line | `cut -c1 file` |
+| chars 1–6 | `cut -c1-6 file` |
+| chars 1 and 3 | `cut -c1,3 file` |
+| colon file se field 1 | `cut -d ':' -f1 /etc/passwd` |
+| multiple fields | `cut -d ':' -f1,3 /etc/passwd` |
+| disk output se field | `df -h \| awk '{print $1}'` |
+| multiple fields format | `df -h \| awk '{print $1,$2,$6}' \| column -t` |
+| gzip compress | `gzip file` |
+| gzip content view | `zcat file.gz` |
+| gzip decompress | `gunzip file.gz` |
+| bzip2 compress | `bzip2 file` |
+| bzip2 content view | `bzcat file.bz2` |
+| bzip2 pager view | `bzmore file.bz2` |
+| bzip2 decompress | `bunzip2 file.bz2` |
+| tar create | `tar -cvf bundle.tar files...` |
+| tar + gzip | `tar -czvf bundle.tar.gz files...` |
+| tar + bzip2 | `tar -cjvf bundle.tar.bz2 files...` |
+| archive list | `tar -tvf bundle.tar` |
+| archive extract | `tar -xvf bundle.tar` |
+
+---
+
+## 19. Common mistakes
+
+1. `cut -f` use karke `-d` delimiter define na karna.
+2. Multi-space aligned output par `cut -d ' '` blind use karna; `awk` better rehta hai.
+3. `.gz` ko `bunzip2` ya `.bz2` ko `gunzip` se kholne ki koshish.
+4. `tar -f` ke baad archive filename dena bhoolna.
+5. `tar -czvf` mein destination archive naam aur source files ka order confuse karna.
+6. Archive list/extract karne se pehle `ls -lh` aur `tar -tvf` se verify na karna.
+
+---
+
+## 20. Class-end doubt recap — `-d` aur `-f`
+
+Doubt session mein trainer `cut` ke `-d` aur `-f` dobara samjhate hain:
+
+- `-d ':'` ka matlab: is symbol ko delimiter maano. `:` se pehle ka part field 1, agle `:` tak field 2, aur aise hi aage.
+- `-f1` ka matlab: delimiter ke basis par bane fields mein se field 1 print karo.
+- Agar field empty hai, output mein empty value aa sakti hai.
+
+Aur ek system update related doubt par trainer officially share kiye gaye page ke steps follow karne bolte hain, especially source list / old Linux setup problem ke case mein.
+
+---
+
+## 21. Final takeaway
+
+Day 6 ka core skill:
+
+1. `cut` se fixed characters aur simple delimiter fields nikaalo.
+2. Irregular/multiple spaces ho to `awk` use karo.
+3. `awk '{print $N}'` field selection aur `column -t` formatting ko pipeline mein jodo.
+4. Single file compression ke liye `gzip`/`bzip2` samajho.
+5. Multiple files ko ek package/archive mein rakhne ke liye `tar` must-know command hai.
+6. Downloaded `.tar.gz`/`.tar.bz2` tools ko list/extract/install karne ke liye ye workflow almost daily use hota hai.
+
+Trainer ka closing point: commands ka chain samajhna hi asli power hai. Individual commands chhoti lagti hain, lekin `grep + awk + cut + tar` mil kar server management, logs, reports, compression, aur package handling ko seconds ka kaam bana dete hain.
