@@ -1,393 +1,810 @@
-# Explanation — Day 10: Advanced File Permissions & `find`
+# Day 10 — Kali Linux Capsule Course: Advanced File Permissions aur `find` (Hinglish Explanation)
 
-**Lecture:** 010 — Kali Linux Free Capsule Course, Day 10
-**Translation:** [`english/010 - Kali Linux Free Capsule Course - Day 10.md`](../english/010%20-%20Kali%20Linux%20Free%20Capsule%20Course%20-%20Day%2010.md)
-**Builds on:** Day 9 (standard permissions, `chmod`, `umask`)
-
----
-
-## Overview
-
-Day 9 covered the **standard** permissions (`rwx` for user/group/other). Day 10 covers the **three advanced permission bits** that sit on top of them, then introduces `find`.
-
-| Bit | Applies to | Purpose |
-|---|---|---|
-| **Sticky Bit** | directories | only the **file owner** may delete their file |
-| **SGID** | directories | new files inherit the **directory's group** |
-| **SUID** | executables | run the file **as its owner** (usually root) |
-
-> **Why this matters:** *"People don't know about SUID and SGID — and your privilege escalation happens on the basis of these."*
+**Source transcript:** `transcripts/010 - Kali Linux Free Capsule Course - Day 10 [ Hindi ].hi-orig.srt`
+**Trainer in transcript:** Nitesh Singh (Defronix)
+**Builds on:** Day 9 — standard permissions, ownership, `chmod` aur `umask`
+**Note:** Ye explanation Hindi original transcript ko samajh kar likhi gayi hai; ye line-by-line literal translation nahi hai. Auto-captions mein `sticky bit`, `SGID`, `SUID`, `find`, `-perm`, `-exec`, `-iname` aur octal values kai jagah garbled mile. Context ke basis par intended Linux concepts aur commands restore karke simple Hinglish mein explain kiya gaya hai.
 
 ---
 
-## Part 1 — The Sticky Bit
+## 1. Day 10 ka focus
 
-### 1.1 The problem it solves
+Day 9 mein standard permissions — `r`, `w`, `x` for owner, group aur others — samjhi gayi thi. Day 10 un permissions ke upar lagne wale **advanced permission bits** cover karta hai:
 
-A real scenario from the lecture:
+1. **Sticky bit** — shared directory mein doosre user ki file ko delete/rename karne se protection.
+2. **SGID, yani Set Group ID** — directory ke andar banne wali files ko directory ka group inherit karwana.
+3. **SUID, yani Set User ID** — executable ko file owner ki identity ke privileges ke saath run karna.
+4. **`find` command** — name, type, owner, permission, size aur other conditions ke basis par files/directories search karna.
+5. **`find -exec`** — search result par automatically koi further command run karna.
 
-1. A company project has **20–30 people** working in one **shared common directory**.
-2. Everyone works there because the **manager** reviews all the files in one place.
-3. Some team members resent each other. One person produces a good report; another doesn't.
-4. The one who couldn't produce a good report **opens the other user's file**, sees the good work, and **deletes it**.
-5. The victim logs in the next day — **the file simply isn't there.**
+Trainer ka security angle clear hai: SUID/SGID bits ko samajhna privilege auditing aur authorized Linux security assessment ke liye important hai. Ye bits administration ka obscure detail nahi, system access-control ka part hain.
 
-> **The requirement:** no user should be able to delete another user's file, even in a fully shared directory.
+---
 
-### 1.2 What the sticky bit does
+## 2. Advanced permission bits ka overview
 
-> **Whoever owns a file is the only one who can delete it.** Nobody else can, regardless of the directory's permissions.
+| Bit | Octal digit | Usually applies to | Main effect |
+|---|---:|---|---|
+| Sticky bit | `1` | Directories | File owner/directory owner/root ke alawa doosre users files delete/rename nahi kar sakte |
+| SGID | `2` | Directories; executables ka separate behavior bhi hota hai | Directory ke andar new files group owner inherit karti hain |
+| SUID | `4` | Executable files | Program file owner ki effective identity ke saath run ho sakta hai |
 
-You already met this on **Day 2** — it is exactly why `/tmp` is world-writable yet safe.
+Special permission digit ko normal three-digit mode ke aage likha jata hai:
 
-### 1.3 The demonstration
-
-**Without the sticky bit:**
-
-```bash
-# as user1
-cd /home/common
-touch user1.txt          # user1 owns this file
-
-# as user2
-whoami                   # user2
-ls -l user1.txt          # owner is user1
-rm user1.txt             # SUCCEEDS — the file is gone
+```text
+special | owner | group | others
+   1    |   7   |   7   |   7       -> sticky + rwx/rwx/rwx
+   2    |   7   |   7   |   5       -> SGID + rwx/rwx/r-x
+   4    |   7   |   5   |   5       -> SUID + rwx/r-x/r-x
 ```
 
-**Applying it:**
+Examples:
 
 ```bash
-chmod +t /home/common
-ls -ld /home/common
-# drwxrwxrwt   ← note the 't' in the last position
+chmod 1777 shared-dir   # sticky bit
+chmod 2775 project-dir  # SGID
+chmod 4755 program      # SUID
 ```
 
-**After:** `user2` can no longer delete `user1`'s file.
+Advanced bits permission string mein `x` ki position par `s` ya `t` ke roop mein dikh sakte hain. Lowercase aur uppercase ka difference neeche detail mein aayega.
 
-### 1.4 Reading the bit
+---
 
-The sticky bit appears **in place of the `x`** in the *others* position:
+## 3. Sticky bit
+
+### 3.1 Shared directory ka problem
+
+Trainer ek project-directory scenario dete hain:
+
+- Ek project par 20–30 log kaam kar rahe hain.
+- Sab members ek common directory mein files create karte hain.
+- Manager wahi directory dekhkar reports/status review karta hai.
+- Ek user doosre user ki file read karke jealous ya malicious behavior mein us file ko delete kar deta hai.
+- Victim next day login karta hai aur uski file missing hoti hai.
+
+Shared directory mein sabko kaam karne ki permission ho sakti hai, lekin requirement ye hai:
+
+> **User apni file par kaam kare, par doosre user ki file ko delete/rename na kar sake.**
+
+### 3.2 Sticky bit kya karta hai?
+
+Directory par sticky bit set hone par us directory ke entries ko delete/rename karne ki permission restricted hoti hai. Normally remove/rename karne wala user in mein se hona chahiye:
+
+- file ka owner,
+- directory ka owner,
+- root/appropriate privileged administrator.
+
+Isliye “directory writable hai” ka matlab ye nahi ki har user doosre user ki files delete kar sakega — sticky bit is behavior ko control karta hai.
+
+### 3.3 `/tmp` se connection
+
+Linux ka `/tmp` directory commonly world-writable hota hai, lekin us par sticky bit laga hota hai. Is wajah se multiple users temporary files create kar sakte hain, par ek normal user doosre user ki temporary file ko casually remove nahi kar sakta.
+
+```bash
+ls -ld /tmp
+```
+
+Typical output mein last permission position par `t` dikh sakta hai:
+
+```text
+drwxrwxrwt ... /tmp
+```
+
+Exact permissions/distribution configuration check karna chahiye.
+
+---
+
+## 4. Sticky bit ka practical demonstration
+
+### 4.1 Lab setup
+
+Disposable VM mein shared directory banao:
+
+```bash
+mkdir -p /tmp/common-lab
+chmod 777 /tmp/common-lab
+```
+
+Do authorized test users use karo, jaise `user1` aur `user2`. User 1 file create kare:
+
+```bash
+su - user1
+touch /tmp/common-lab/user1.txt
+exit
+```
+
+Sticky bit ke bina, agar directory writable hai, to user2 file delete karne ki koshish kar sakta hai:
+
+```bash
+su - user2
+rm /tmp/common-lab/user1.txt
+```
+
+Ye test sirf disposable lab file par karo.
+
+### 4.2 Sticky bit apply karna
+
+```bash
+chmod +t /tmp/common-lab
+ls -ld /tmp/common-lab
+```
+
+Output kuch is type ka ho sakta hai:
+
+```text
+drwxrwxrwt ... /tmp/common-lab
+```
+
+Ab `user2` ko `user1.txt` delete/rename karne ki permission deny honi chahiye, jab tak user2 directory owner/root na ho.
+
+### 4.3 Symbolic aur numeric method
+
+```bash
+chmod +t /tmp/common-lab
+chmod -t /tmp/common-lab
+```
+
+- `+t` sticky bit add karta hai.
+- `-t` sticky bit remove karta hai.
+
+Numeric method:
+
+```bash
+chmod 1777 /tmp/common-lab   # sticky bit + rwx for all
+chmod 0777 /tmp/common-lab   # special bit remove, ordinary 777
+```
+
+Leading `1` sticky bit represent karta hai. Numeric command run karne ke baad `ls -ld` se actual result verify karo.
+
+---
+
+## 5. Sticky bit mein `t` aur `T`
+
+Sticky bit others ke execute position par display hota hai:
 
 | Display | Meaning |
 |---|---|
-| **small `t`** | sticky bit set **AND** execute permission present |
-| **capital `T`** | sticky bit set **WITHOUT** execute permission |
+| Lowercase `t` | Sticky bit set aur others execute bit bhi present |
+| Uppercase `T` | Sticky bit set, lekin others execute bit absent |
 
-> **The capital/lowercase rule applies to all three advanced bits** — capital means the underlying execute bit is missing.
+Example conceptually:
 
-### 1.5 Setting and removing
-
-```bash
-chmod +t  /home/common      # add (symbolic)
-chmod -t  /home/common      # remove (symbolic)
-chmod 1777 /home/common     # add (octal — leading 1)
-chmod 0777 /home/common     # remove (octal — leading 0)
+```text
+drwxrwxrwt   -> sticky + others x
+ drwxrwxrwT  -> sticky, but others x absent
 ```
 
-> **The fourth (leading) octal digit is the advanced permission digit.** `1` = sticky bit.
+Uppercase/lowercase rule ko SUID aur SGID par bhi apply kiya ja sakta hai:
+
+- Lowercase special letter = special bit + underlying execute bit.
+- Uppercase special letter = special bit set, underlying execute bit absent.
+
+Directory sticky bit ko check karte waqt sirf `t` dekhna enough nahi; directory ka actual `w`/`x` context bhi samjho.
 
 ---
 
-## Part 2 — SGID (Set Group ID)
+## 6. SGID — Set Group ID on a directory
 
-### 2.1 What it does
+### 6.1 SGID ka main directory behavior
 
-> **If SGID is set on a directory, it makes sure that every file or directory created inside it inherits the directory's group owner.**
-
-### 2.2 Why you want it
-
-A project directory is shared by many members. You want **every file created inside it to belong to the project group**, so all members can read each other's work according to the group permissions.
-
-**Without SGID:** a new file gets the *creator's* primary group — so you must **manually change the group ownership again and again**, for every file, forever.
-
-**With SGID:** it happens automatically.
-
-### 2.3 The demonstration
-
-**The problem first:**
+Directory par SGID set karne se us directory ke andar create hone wali new files/directories ko parent directory ka **group owner** inherit karne ka behavior milta hai.
 
 ```bash
-chmod 777 /tmp/project90
-chgrp project /tmp/project90     # directory's group = project
-
-cd /tmp/project90
-touch testfile.txt
-ls -l testfile.txt
-# group owner is the CREATOR's group — not "project"
+chmod g+s project-dir
 ```
 
-**Applying SGID:**
+Iska use shared project directories mein hota hai. Team members ka primary group different ho sakta hai, lekin project directory ke andar banne wali files ko common project group mil jata hai.
+
+### 6.2 SGID ke bina problem
+
+Suppose:
+
+- Project directory ka group `project` hai.
+- User1 ka primary group `user1` hai.
+- User2 ka primary group `user2` hai.
+
+Agar SGID nahi laga, to new file ka group creator ke default/primary group se aa sakta hai. Har file ke baad administrator ko `chgrp project file` karna padega.
+
+20–30 members ke project mein ye repetitive aur error-prone workflow hai.
+
+### 6.3 SGID ke saath solution
 
 ```bash
-chmod g+s /tmp/project90
-ls -ld /tmp/project90
-# drwxrws---   ← 's' replaces 'x' in the GROUP position
+mkdir -p /tmp/project-lab
+chmod 770 /tmp/project-lab
+chgrp project /tmp/project-lab
+chmod g+s /tmp/project-lab
+ls -ld /tmp/project-lab
 ```
 
-Now every new file inside inherits the `project` group automatically.
+Typical permission display:
 
-### 2.4 Reading and removing
+```text
+drwxrws--- ... /tmp/project-lab
+```
+
+Ab authorized project members ke liye newly created files ka group `project` inherit ho sakta hai.
+
+> Group members ko actual read/write access ke liye directory/file permissions bhi correct honi chahiye. SGID ownership inheritance karta hai; ye apne aap group ko permission grant nahi karta.
+
+### 6.4 SGID display: `s` aur `S`
+
+SGID group ke execute position par display hota hai:
 
 | Display | Meaning |
 |---|---|
-| **small `s`** (group position) | SGID set **with** execute |
-| **capital `S`** (group position) | SGID set **without** execute |
+| Lowercase `s` | SGID set + group execute present |
+| Uppercase `S` | SGID set, group execute absent |
+
+Symbolic methods:
 
 ```bash
-chmod g+s dir       # add
-chmod g-s dir       # remove
-chmod 2777 dir      # octal — leading 2 = SGID
+chmod g+s project-dir
+chmod g-s project-dir
 ```
+
+Numeric methods:
+
+```bash
+chmod 2775 project-dir   # leading 2 = SGID
+chmod 0775 project-dir   # special bit removed
+```
+
+### 6.5 SGID aur file inheritance verify karna
+
+```bash
+su - project-user
+touch /tmp/project-lab/report.txt
+exit
+ls -l /tmp/project-lab/report.txt
+```
+
+File ka group project group ke according check karo. Exact behavior filesystem, mount options aur distribution par depend kar sakta hai, lekin Linux project-directory ka standard use-case yahi hai.
 
 ---
 
-## Part 3 — SUID (Set User ID)
+## 7. SUID — Set User ID on an executable
 
-### 3.1 The puzzle that motivates it
+### 7.1 Password-change puzzle
 
-A normal user has no privileges — yet:
+Day 8 mein samjha tha ki `/etc/shadow` protected file hai. Normal user ko us file ko directly write karne ki permission nahi hoti.
+
+Phir normal user apna password kaise change karta hai?
 
 ```bash
-passwd          # a normal user CAN change their own password
+passwd
 ```
 
-But changing a password means **writing to `/etc/shadow`**, which (from Day 8) **only root can access.**
-
-**How is that possible?**
-
-### 3.2 The answer
+Password change karne ke process ko password hash update karna padta hai. Isliye trainer `/usr/bin/passwd` ke permission output ko example banate hain:
 
 ```bash
 ls -l /usr/bin/passwd
-# -rwsr-xr-x  1 root root ...
-#    ↑ 's' in the USER position — SUID is set
 ```
 
-> **SUID means the file is executed as if its own owner had executed it.** Since `/usr/bin/passwd` is owned by **root**, it runs **as root** no matter who launches it.
+Typical output mein user/owner permission block mein `s` dikh sakta hai:
 
-The same applies to **`sudo`** — SUID is set on it too, which is how it can elevate at all.
+```text
+-rwsr-xr-x 1 root root ... /usr/bin/passwd
+```
 
-### 3.3 Reading and setting
+### 7.2 SUID ka meaning
+
+Executable par SUID bit set ho to program run karte waqt effective user identity file owner ki identity ban sakti hai. Agar executable root-owned SUID hai, to us particular program ke controlled operation ko root privileges mil sakte hain.
+
+Simple explanation:
+
+> **SUID program ko launch karne wale user ke badle file owner ke effective privileges ke saath run karne ka behavior deta hai.**
+
+`passwd` trusted program ke roop mein required protected update perform karta hai. Isi wajah se SUID root binary security-sensitive hoti hai.
+
+Kuch systems par `sudo` bhi setuid-root binary ke roop mein installed hota hai, lekin actual system par output verify karo:
+
+```bash
+ls -l "$(command -v sudo)"
+```
+
+### 7.3 SUID display: `s` aur `S`
+
+SUID user/owner ke execute position par display hota hai:
 
 | Display | Meaning |
 |---|---|
-| **small `s`** (user position) | SUID set **with** execute |
-| **capital `S`** (user position) | SUID set **without** execute |
+| Lowercase `s` | SUID set + owner execute present |
+| Uppercase `S` | SUID set, owner execute absent |
+
+Symbolic methods:
 
 ```bash
-chmod u+s file      # add
-chmod u-s file      # remove
-chmod 4755 file     # octal — leading 4 = SUID
+chmod u+s program
+chmod u-s program
 ```
 
-### 3.4 ⚠ The security significance
-
-SUID is the single most abused mechanism in **Linux privilege escalation**:
-
-- A SUID root binary runs **with root's power**.
-- If that binary can be made to run arbitrary commands, **the attacker becomes root**.
-- Hence the classic enumeration step: **find every SUID binary on the system** and check it against known exploits.
+Numeric methods:
 
 ```bash
-find / -perm -4000 -type f 2>/dev/null     # find all SUID binaries
-find / -perm -2000 -type f 2>/dev/null     # find all SGID binaries
+chmod 4755 program   # leading 4 = SUID
+chmod 0755 program   # SUID removed
+```
+
+### 7.4 SUID security risk
+
+SUID root binary powerful hoti hai. Agar:
+
+- binary vulnerable ho,
+- unsafe command execution kare,
+- attacker-controlled input ko insecurely process kare,
+- environment/path ko trust kare,
+- ya known misconfiguration ho,
+
+to normal user privilege boundary cross kar sakta hai.
+
+Isliye authorized Linux security assessment mein SUID binaries enumerate karke unka owner, version, permissions aur behavior review kiya jata hai.
+
+> SUID bit khud vulnerability nahi hoti. Trusted program ko limited privileged operation ke liye SUID ki zarurat ho sakti hai. Risk depends on program design, version, configuration aur exploitability.
+
+---
+
+## 8. SUID, SGID aur sticky bit — one-table revision
+
+| Bit | Octal | Symbolic | Permission string position | Main use |
+|---|---:|---|---|---|
+| SUID | `4` | `u+s` | Owner `x` position | Executable file owner ki effective identity use kar sakta hai |
+| SGID | `2` | `g+s` | Group `x` position | Directory files ko parent group inherit karwa sakti hai |
+| Sticky | `1` | `+t` | Others `x` position | Shared directory mein delete/rename restriction |
+
+Examples:
+
+```bash
+chmod 4755 program    # SUID
+chmod 2775 directory  # SGID
+chmod 1777 directory  # sticky
+chmod 7777 object     # all three special bits + 777
+```
+
+Lowercase/uppercase recap:
+
+```text
+s  = special bit + corresponding execute bit
+S  = special bit without corresponding execute bit
+t  = sticky bit + others execute bit
+T  = sticky bit without others execute bit
+```
+
+Special-bit display ko `ls -l` se verify karo:
+
+```bash
+ls -l program
+ls -ld directory
 ```
 
 ---
 
-## Part 4 — The three bits summarised
+## 9. SUID/SGID enumerate karna
 
-| Bit | Octal | Symbolic | Position shown | Set on | Effect |
-|---|---|---|---|---|---|
-| **SUID** | **4** | `u+s` | **user** `x` → `s` | executables | run as the **file's owner** |
-| **SGID** | **2** | `g+s` | **group** `x` → `s` | directories | new files inherit the **directory's group** |
-| **Sticky** | **1** | `+t` | **others** `x` → `t` | directories | only the **owner** may delete their files |
+Authorized audit ya lab enumeration ke liye:
 
 ```bash
-chmod 4755 file     # SUID
-chmod 2775 dir      # SGID
-chmod 1777 dir      # Sticky
-chmod 7777 x        # all three (4+2+1)
+find / -perm -4000 -type f 2>/dev/null
 ```
 
-> Lowercase letter = the execute bit is also present. **Uppercase = execute is missing.**
+Ye root filesystem ke neeche SUID bit wale regular files dhoondhne ka common pattern hai.
+
+SGID files dhoondhna:
+
+```bash
+find / -perm -2000 -type f 2>/dev/null
+```
+
+Directories ko bhi review karna ho to `-type f` remove ya appropriate type condition use karo.
+
+### 9.1 Enumeration result ko blindly trust mat karo
+
+Har SUID file exploitable nahi hoti. Review points:
+
+1. File ka full path.
+2. Owner/group.
+3. Package aur version.
+4. Kya SUID bit expected hai?
+5. Program input aur subprocess behavior.
+6. File writable to nahi?
+7. Recent unauthorized addition to nahi?
+8. Known vendor security advisory/patch status.
+
+Unfamiliar SUID binary ko delete ya execute karne ke badle pehle evidence preserve aur owner/admin se verify karo.
 
 ---
 
-## Part 5 — The `find` command
+## 10. `find` command ka introduction
 
-> Described as a **very important command** — necessary knowledge whatever you go on to do.
+Trainer `find` ko very important command batate hain, kyunki filesystem mein naam, type, permissions, owner, group, size aur other conditions ke basis par search ki ja sakti hai.
 
-### 5.1 Basic search
-
-```bash
-find .                      # everything under the current directory
-find . -name "*.txt"        # by name, with wildcard
-find / -name "testfile.txt" # search the whole file system
-```
-
-### 5.2 `-type` — restrict what you match
+Basic form:
 
 ```bash
-find . -type f -name "test.txt"    # files only
-find . -type d -name "tmp"         # directories only
+find <starting-path> <conditions> <actions>
 ```
 
-| Value | Matches |
+### 10.1 Current directory ke andar sab kuch
+
+```bash
+find .
+```
+
+`.` current working directory ko represent karta hai. Iske andar ki files aur directories recursive way mein list ho sakti hain.
+
+### 10.2 Name ke basis par search
+
+```bash
+find . -name "test.txt"
+find / -name "testfile.txt" 2>/dev/null
+```
+
+Wildcard:
+
+```bash
+find . -name "*.txt"
+find . -name "test*"
+```
+
+Shell wildcard ko quote karna important hai, taaki `*` shell expand karne ke badle `find` ko mile.
+
+### 10.3 `-type` se object restrict karna
+
+```bash
+find . -type f -name "test.txt"
+find . -type d -name "tmp"
+find . -type l -name "link*"
+```
+
+| Value | Match |
 |---|---|
-| `f` | regular files |
-| `d` | directories |
-| `l` | symbolic links |
+| `f` | Regular file |
+| `d` | Directory |
+| `l` | Symbolic link |
 
-### 5.3 `-iname` — case-insensitive
+### 10.4 Case-insensitive search — `-iname`
 
-Linux is case-sensitive, so `-name "test*"` will **not** match `Test.txt`.
-
-```bash
-find . -type f -iname "test*"      # matches both test.txt and Test.txt
-```
-
-> **`-iname` is `-name` with the case sensitivity bypassed.**
-
-### 5.4 `-perm` — search by permission
+Linux filenames case-sensitive hote hain. `-name "test*"` aur `-name "Test*"` different patterns hain.
 
 ```bash
-find / -perm 774 -print       # exactly these permissions
-find / ! -perm 077 -print     # NOT these — the ! negates
+find . -type f -iname "test*"
 ```
 
-The **`!`** operator inverts any test.
+`-iname` case ko ignore karta hai, isliye `test.txt`, `Test.txt` aur `TEST.TXT` match ho sakte hain.
 
-### 5.5 `-user` — search by owner
+### 10.5 Specific directory ya full filesystem
+
+```bash
+find /tmp -type f -name "*.log"
+find / -type f -name "*.conf" 2>/dev/null
+```
+
+`/` se search expensive ho sakta hai aur permission errors aa sakte hain. Required scope se start karo; full root search sirf authorized maintenance/audit context mein karo.
+
+---
+
+## 11. Permission ke basis par `find`
+
+### 11.1 Exact mode — `-perm 774`
+
+```bash
+find /path -perm 774 -print
+```
+
+Ye exact permission mode `774` wale matches dhoondhne ka pattern hai.
+
+### 11.2 At-least permission bits — `-perm -4000`
+
+```bash
+find / -perm -4000 -type f 2>/dev/null
+```
+
+Leading `-` ka meaning broadly ye hai ki specified permission bits present hon; isi pattern se SUID enumeration ki jati hai.
+
+### 11.3 Permission test negate karna — `!`
+
+```bash
+find /path ! -perm 077 -print
+```
+
+`!` next test ko negate karta hai. Exact command ki interpretation samajhkar run karo; `-perm 077` ka meaning aur path scope verify karo.
+
+Modern GNU `find` mein `-perm /mode` ka pattern “in bits mein se koi bhi bit” check karne ke liye bhi use hota hai:
+
+```bash
+find /path -perm /022 -type f -print
+```
+
+Is variation ko system ke `man find` se confirm karo.
+
+---
+
+## 12. Owner aur group ke basis par search
+
+### 12.1 `-user`
 
 ```bash
 find . -user root
+find /home -user olduser -print
 ```
 
-> Lets you find out **which files were created by a particular user** anywhere in your machine — directly useful in forensics and in the Day 7 orphaned-file scenario.
+Ye specific username ke owner wali files dhoondhne mein useful hai — inventory, migration, cleanup aur authorized forensics ke liye.
 
-### 5.6 `-empty` — find empty files
+### 12.2 `-group`
+
+```bash
+find /project -group project
+```
+
+Group ownership audit karne ke liye use hota hai. Day 9 ke shared project/group-permission scenario ke saath iska direct connection hai.
+
+### 12.3 Numeric owner/group
+
+Deleted user ke orphaned files ke cases mein username resolve nahi hota. Numeric ownership inspect karne ke liye:
+
+```bash
+ls -lan path/to/file
+```
+
+`find -nouser` aur `find -nogroup` bhi unresolved ownership dhoondhne mein useful hain:
+
+```bash
+find / -nouser -o -nogroup 2>/dev/null
+```
+
+---
+
+## 13. Empty files aur size ke basis par search
+
+### 13.1 Empty files
 
 ```bash
 find /tmp -type f -empty
-find /    -type f -empty
+find /path -type f -empty -print
 ```
 
-### 5.7 `-size` — search by size
+Full `/` scan output-heavy aur slow ho sakta hai, isliye starting path carefully choose karo.
+
+### 13.2 Size
 
 ```bash
-find / -size 50M      # files of 50 MB
-find / -size +100M    # larger than 100 MB
-find / -size -10M     # smaller than 10 MB
+find /path -type f -size 50M
+find /path -type f -size +100M
+find /path -type f -size -10M
 ```
+
+General meaning:
+
+- `50M` — size unit ke according 50M match pattern.
+- `+100M` — 100M se larger.
+- `-10M` — 10M se smaller.
+
+GNU `find` size rounding/block-unit semantics rakhta hai. Exact boundary checks ke liye `-printf` ya `stat` se actual byte size verify karo.
 
 ---
 
-## Part 6 — `-exec`: the most important feature ⭐
+## 14. `find -exec` — result par command chalana
 
-### 6.1 The problem
+### 14.1 Problem
 
-You find 200 files matching a criterion. Now you need to change all their permissions.
+Maan lo 200 files milti hain jinki permissions change karni hain. Manual method:
 
-**The slow way:** find them, read the output, then `chmod` each one **one by one by one**.
+1. `find` run karo.
+2. Output copy/read karo.
+3. Har file par alag `chmod` run karo.
 
-### 6.2 The solution
+Ye slow, repetitive aur error-prone hai.
 
-> **`find` can both locate the files AND fire a further command on every result — in one step instead of two or three.**
+### 14.2 One-step solution
+
+`find` ke result par further command run karne ke liye `-exec` use hota hai:
 
 ```bash
-find / -perm 2644 -exec chmod 2777 {} \;
+find /path -type f -perm 2644 -exec chmod 2777 {} \;
 ```
 
-### 6.3 The syntax, piece by piece
+Is command ko root filesystem par blindly run mat karo; `/path` ko lab/test directory se replace karo.
+
+### 14.3 Syntax breakdown
 
 | Part | Meaning |
 |---|---|
-| `-exec` | **execute** the following command |
-| `chmod 2777` | the command and its arguments |
-| `{}` | placeholder — **substituted with each file found** |
-| `\;` | **terminator — mandatory** |
+| `find /path` | Search ka starting path |
+| `-type f` | Sirf regular files |
+| `-perm 2644` | Condition: exact permission mode |
+| `-exec` | Har result par command run karo |
+| `chmod 2777` | Result par run hone wali command |
+| `{}` | Current found path ka placeholder |
+| `\;` | `-exec` expression ka mandatory terminator |
 
-> **The `{}` and the `\;` at the end are not optional.** Omitting the terminator produces `find: missing argument to '-exec'` — exactly the error hit live in the lecture.
+Important:
 
-**Also note:** everything must be **space-separated**, including before `{}` and before `\;`.
+- `{}` aur `\;` required hote hain.
+- `{}` ke baad space hona chahiye.
+- Shell ko semicolon pass karne ke liye `\;` likho.
+- Terminator omit karne par `find: missing argument to '-exec'` jaise error aa sakta hai.
 
-### 6.4 More examples
-
-```bash
-find . -name "*.tmp" -exec rm {} \;              # delete all matches
-find . -type f -perm 777 -exec chmod 644 {} \;   # fix loose permissions
-find . -name "*.log" -exec grep "ERROR" {} \;    # search inside matches
-find . -user olduser -exec chown newuser {} \;   # reassign ownership
-```
-
-> **Why it matters: your time is saved.** This is the difference between a one-line fix and an afternoon of manual work.
-
----
-
-## Part 7 — Complete cheat sheet
+### 14.4 More examples
 
 ```bash
-# ---- Advanced permission bits ----
-# SUID = 4 (user), SGID = 2 (group), Sticky = 1 (others)
+find . -name "*.tmp" -exec rm -- {} \;
+find . -type f -perm 777 -exec chmod 644 {} \;
+find . -name "*.log" -exec grep -H "ERROR" {} \;
+find . -user olduser -exec chown newuser {} \;
+```
 
-chmod u+s file      /  chmod 4755 file    # SUID  -> rws------
-chmod g+s dir       /  chmod 2775 dir     # SGID  -> ---rws---
-chmod +t  dir       /  chmod 1777 dir     # Sticky-> ------rwt
+Destructive commands jaise `rm`, `chmod`, `chown` ko pehle `-print` ke saath dry-run/review karo:
 
-chmod u-s file / chmod g-s dir / chmod -t dir     # remove
+```bash
+find . -name "*.tmp" -print
+```
 
-ls -ld dir          # inspect a directory's own bits
-# lowercase s/t -> bit set WITH execute
-# UPPERCASE S/T -> bit set WITHOUT execute
+Result expected ho tabhi action command add karo.
 
-# Enumeration (privilege escalation)
-find / -perm -4000 -type f 2>/dev/null    # all SUID binaries
-find / -perm -2000 -type f 2>/dev/null    # all SGID binaries
+### 14.5 `-exec ... {} +` variation
 
-# ---- find ----
-find .                          # everything here
-find / -name  "file.txt"        # by name
-find / -iname "file.txt"        # case-insensitive
-find . -type f / -type d / -type l
-find / -perm 774 -print
-find / ! -perm 077 -print       # negate
-find . -user root               # by owner
-find . -group project           # by group
-find / -type f -empty           # empty files
-find / -size 50M / +100M / -10M # by size
+Multiple paths ko batch mein command ko pass karne ke liye:
 
-# -exec  (note the {} and the mandatory \; )
-find / -perm 2644 -exec chmod 2777 {} \;
-find . -name "*.tmp" -exec rm {} \;
+```bash
+find . -type f -name "*.log" -exec grep -H "ERROR" {} +
+```
+
+`\;` har result par command run kar sakta hai, jabki `+` multiple results batch kar sakta hai. Exact command behavior aur argument safety ke liye `man find` check karo.
+
+---
+
+## 15. Complete advanced-permission lab workflow
+
+### 15.1 Sticky directory
+
+```bash
+mkdir -p /tmp/perm-lab/shared
+chmod 777 /tmp/perm-lab/shared
+chmod +t /tmp/perm-lab/shared
+ls -ld /tmp/perm-lab/shared
+```
+
+### 15.2 SGID project directory
+
+```bash
+mkdir -p /tmp/perm-lab/project
+chgrp project /tmp/perm-lab/project
+chmod 2770 /tmp/perm-lab/project
+ls -ld /tmp/perm-lab/project
+```
+
+Ensure `project` group exists and authorized test users are members before testing.
+
+### 15.3 Inspect SUID files
+
+```bash
+find /usr/bin /usr/sbin -type f -perm -4000 -print 2>/dev/null
+```
+
+System directories scope karna full `/` search se safer/faster ho sakta hai.
+
+### 15.4 Test `find` without changing anything
+
+```bash
+find /tmp/perm-lab -type f -print
+find /tmp/perm-lab -type f -perm 644 -print
+find /tmp/perm-lab -type f -empty -print
+```
+
+Expected output verify hone ke baad hi `-exec chmod` ya `-exec chown` add karo.
+
+---
+
+## 16. Day 10 command summary
+
+```bash
+# Inspect special permissions
+ls -l /usr/bin/passwd
+ls -ld /tmp
+ls -ld project-dir
+
+# Sticky bit
+chmod +t shared-dir
+chmod -t shared-dir
+chmod 1777 shared-dir
+chmod 0777 shared-dir
+
+# SGID
+chmod g+s project-dir
+chmod g-s project-dir
+chmod 2775 project-dir
+
+# SUID
+chmod u+s program
+chmod u-s program
+chmod 4755 program
+
+# Enumerate special-bit files
+find / -type f -perm -4000 2>/dev/null   # SUID
+find / -type f -perm -2000 2>/dev/null   # SGID
+
+# Basic find
+find .
+find . -name "*.txt"
+find . -type f -name "test.txt"
+find . -type d -name "tmp"
+find . -type f -iname "test*"
+
+# Conditions
+find /path -perm 774 -print
+find /path ! -perm 077 -print
+find /path -user root -print
+find /path -group project -print
+find /path -type f -empty -print
+find /path -type f -size +100M -print
+
+# Execute an action on matches
+find /path -type f -name "*.tmp" -exec rm -- {} \;
+find /path -type f -perm 777 -exec chmod 644 {} \;
 ```
 
 ---
 
-## Part 8 — Self-check questions
+## 17. Common mistakes aur safety points
 
-1. Describe the shared-project scenario. What problem does the sticky bit solve?
-2. Which system directory uses the sticky bit by default, and why?
-3. Where does `t` appear in the permission string? What is the difference between `t` and `T`?
-4. What does SGID do when set on a directory? What tedious task does it eliminate?
-5. Where does `s` appear for SGID versus SUID?
-6. How can a normal user change their own password when only root can write to `/etc/shadow`?
-7. Define SUID in one sentence. Name two SUID binaries mentioned in class.
-8. Give the octal digit for each of SUID, SGID and sticky. What is `chmod 7777`?
-9. What is the general rule for lowercase versus uppercase in the advanced bits?
-10. Why is SUID central to Linux privilege escalation? Write the command to enumerate all SUID binaries.
-11. Difference between `-name` and `-iname`, and why it matters on Linux.
-12. What does `!` do in a `find` expression?
-13. Write commands to find: all directories named `tmp`; all empty files; all files owned by root; all files over 100 MB.
-14. Explain each part of `find / -perm 2644 -exec chmod 2777 {} \;`.
-15. What does `{}` stand for? What happens if you omit `\;`?
-16. Why is `-exec` preferable to finding files and then acting on them separately?
+1. Sticky bit ko “koi bhi delete nahi kar sakta” samajhna; file owner, directory owner aur root exceptions hote hain.
+2. Sticky bit ko file par apply karke same directory behavior expect karna; iska main use shared directories mein hai.
+3. SGID ko group permissions samajhna; SGID inheritance control karta hai, permissions alag set karni padti hain.
+4. SUID root binary ko automatically vulnerable samajhna; program behavior aur version review karna zaruri hai.
+5. `s` aur `S`, `t` aur `T` ka execute-bit difference ignore karna.
+6. `chmod 4755` jaise special permissions ko unknown program par blindly apply karna.
+7. SUID/SGID enumeration results ko bina authorization ke exploit karna.
+8. `find /` full-root search ko har baar use karna; slow output aur permission errors aa sakte hain.
+9. `-name` aur `-iname` ko same samajhna.
+10. `-type f`/`d`/`l` condition omit karke unwanted object types match karna.
+11. `-perm 774` exact-match semantics ko `-perm -774` se confuse karna.
+12. `find -exec` mein `{}` ya `\;` omit karna.
+13. `find` result review kiye bina `rm`, `chmod` ya `chown` execute karna.
+14. Root filesystem par broad permission changes karna.
+15. Shared lab ke bajay real user files ya production directories par testing karna.
 
 ---
 
-## Part 9 — Where the course stands
+## 18. Self-check questions
 
-**File Security is now complete** — standard permissions (Day 9) and advanced permissions (Day 10), plus `find` as the tool that ties permission auditing together.
+1. Sticky bit kis problem ko solve karta hai?
+2. `/tmp` jaise shared directory mein sticky bit useful kyu hai?
+3. Sticky bit permission string mein kahan dikhai deta hai?
+4. Lowercase `t` aur uppercase `T` ka difference kya hai?
+5. Sticky directory mein file delete karne ke authorized exceptions kaunse hain?
+6. Directory par SGID ka effect kya hota hai?
+7. SGID shared project directory ke group-management problem ko kaise solve karta hai?
+8. SGID group execute position mein `s`/`S` kyu dikhata hai?
+9. Normal user `passwd` run karke apna password kaise change kar pata hai?
+10. SUID ka one-sentence definition do.
+11. SUID aur SGID ke octal digits kya hain?
+12. SUID root binary security-sensitive kyu hoti hai?
+13. SUID files enumerate karne ki safe audit command kya hai?
+14. `find .`, `find . -name '*.txt'` aur `find . -type f -iname 'test*'` mein difference kya hai?
+15. `-name` aur `-iname` ka difference kya hai?
+16. `-perm 774` aur `-perm -4000` ka conceptual difference kya hai?
+17. `find` mein `!` operator kya karta hai?
+18. `-user`, `-group`, `-empty` aur `-size` conditions ka use batao.
+19. `find -exec` mein `{}` ka meaning kya hai?
+20. `\;` ko escape karke likhna kyu zaruri hai?
+21. `-exec ... {} \;` aur `-exec ... {} +` mein broad difference kya hai?
+22. Broad `find -exec rm` run karne se pehle kaunsa safety workflow follow karoge?
+23. `chmod 1777`, `chmod 2775` aur `chmod 4755` kis special bit ko represent karte hain?
+24. Special permission bits ko production mein change karne se pehle kaunse checks karne chahiye?
 
-The recurring thread across Days 7–10: **users and groups → privileges → permissions → the bits that bend those permissions → the tool that audits them all.** Every one of these is a privilege-escalation surface, which is why the trainer treats them as foundational for security work rather than as administration trivia.
+---
+
+## 19. Final takeaway
+
+Day 10 ka core message:
+
+- Sticky bit shared directory mein users ko doosre users ki files delete/rename karne se restrict karta hai.
+- SGID project directory ke andar new files ko common group inherit karwa kar collaboration simplify karta hai.
+- SUID executable ko file owner ke effective privileges ke saath run kar sakta hai; root-owned SUID binaries carefully audit honi chahiye.
+- Special bits ke octal digits `4 = SUID`, `2 = SGID`, `1 = sticky` hain.
+- Lowercase `s/t` underlying execute permission ke saath special bit dikhate hain; uppercase `S/T` execute ke bina.
+- `find` filesystem search, permission auditing, owner/group discovery aur cleanup workflows ke liye powerful hai.
+- `find -exec` search result par further command automate karta hai, lekin destructive action se pehle dry-run/review zaruri hai.
+- Advanced permissions aur `find` ko sirf authorized lab/administration context mein use karo.
+
+Days 9–10 ke saath basic aur advanced file security ka foundation complete hota hai: permissions kaise read/change hoti hain, special bits kya karte hain, aur filesystem ko efficiently audit kaise karna hai.
