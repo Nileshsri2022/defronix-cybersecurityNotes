@@ -1,132 +1,144 @@
-# Explanation — OSINT Day 2: Search Engines & Google Dorking
+# OSINT Day 2 — Search Engines aur Google Dorking (Hinglish Explanation)
 
-**Lecture:** 017 — Day 2, OSINT Free Live Training Capsule Course
-**Translation:** [`english/017 - Day-2 OSINT Free Live Training Capsule Course.md`](../english/017%20-%20Day-2%20OSINT%20Free%20Live%20Training%20Capsule%20Course.md)
-**Builds on:** OSINT Day 1 (what OSINT is, the legal boundary)
-
----
-
-## Part 0 — Why half this lecture is "basics"
-
-The trainer spends the first half on search engine mechanics before touching a single dork. His justification is worth keeping:
-
-> **"Delivering Google Dorking would hardly take 15 to 20 minutes. But I don't want the concept delivered in only 15 minutes, because a very basic concept is attached to it."**
->
-> **"If you don't know that basic concept, then if tomorrow you have to build YOUR OWN Google Dorks, you will not be able to build them."**
-
-### The failure mode this prevents
-
-> You blindly search for a website with dorks. Nothing comes back. You conclude *"Google Dorking doesn't work."*
->
-> **The real reason: that website was never INDEXED.** Google has no information about it at all. No dork can retrieve what was never crawled.
-
-**Diagnostic rule:** if a plain search returns nothing for a target, **a dork will not help either.** Check indexing first.
+**Source transcript:** `transcripts/017 - Day-2 OSINT Free Live Training Capsule Course [ Hindi ].hi-orig.srt`
+**Trainer in transcript:** Nitesh Singh (Defronix)
+**Builds on:** OSINT Day 1 — OSINT definition, legal boundary aur information-gathering mindset
+**Note:** Ye explanation Hindi original transcript ko context ke saath samajh kar likhi gayi hai; ye literal translation nahi hai. Search operators sirf public, authorized research/lab targets par use karo. Exposed data milne par download, access-control bypass ya misuse ke badle responsible reporting follow karo.
 
 ---
 
-## Part 1 — What a search engine is
+## 1. Day 2 ka focus
 
-> **A complex program designed to search for information on the World Wide Web.**
+Aaj trainer Google Dorking se pehle search-engine fundamentals explain karte hain. Reason:
 
-| Engine | Approximate share of use |
+> Agar aapko crawling, indexing aur ranking ka basic concept nahi pata, to aap operators blindly type karoge aur result na milne par samjhoge ki dorking kaam nahi karti.
+
+Aaj ke main topics:
+
+- Search engine kya karta hai
+- Crawling, indexing aur ranking
+- Crawler/spider ka role
+- `robots.txt`
+- HTML/XML sitemap
+- Google Dorking aur black-box OSINT
+- `site:`, `inurl:`, `intitle:`, `intext:`, `filetype:`, exact phrase aur date operators
+- Public exposure ko safely report karna
+- Search noise/stale data ki limitations
+
+---
+
+## 2. Search engine kya hota hai?
+
+Search engine ek complex program/service hai jo World Wide Web par available information ko discover, organize aur query ke basis par results mein show karta hai.
+
+Google, Bing, Yahoo aur other engines apne crawling/indexing/ranking systems use karte hain. User ko result milliseconds mein milta hai, lekin background mein information pehle se process ho chuki hoti hai.
+
+### 2.1 Search ke three stages
+
+```text
+Crawling -> Indexing -> Ranking -> Search result
+```
+
+| Stage | Meaning |
 |---|---|
-| **Google** | the large majority |
-| Yahoo, Bing, others | ~20–30% combined |
+| Crawling | Automated programs pages/links scan karte hain |
+| Indexing | Collected information organize/store hoti hai |
+| Ranking | Query ke liye results relevance/order mein aate hain |
 
-The key insight: when you get results in milliseconds, **the work was already done long before you typed anything.**
+Critical visibility chain:
 
----
+> **Not crawled -> not indexed -> search result mein appear nahi hoga.**
 
-## Part 2 — ⭐ The three stages
-
-> **"To show information, search engines do a lot of BACKGROUND WORK."**
-
-| Stage | What happens |
-|---|---|
-| **1. Crawling** | Programs scan the web and collect data |
-| **2. Indexing** | That data is organised and stored |
-| **3. Ranking** | Results are ordered by relevance |
-
-### 2.1 Crawling
-
-> **Crawlers (also called SPIDERS) are programs responsible for finding information publicly available on the internet.** They **scan the whole HTML code** and try to **understand** it.
-
-What a crawler extracts from each page:
-
-- **Structure** of the page
-- **Type of content**
-- **Meaning** of the content
-- **When created**
-- **When updated**
-
-The crawler then hands this to the search engine, which **stores it on its local server.**
-
-### 2.2 Indexing
-
-With **billions of websites**, raw storage is useless — it must be organised. *"Like it happens in a LIBRARY."*
-
-**What actually gets stored** (not the whole page):
-
-- Title
-- Description
-- Type of content
-- Associated keywords
-- Number of **incoming and outgoing links**
-
-### 2.3 ⚠ The visibility chain
-
-> **Not crawled → not indexed → NEVER appears in search results.**
-
-This single chain explains why some targets are invisible to any amount of dorking.
+Dork search engine ke index ko filter karta hai; wo non-indexed/private data magically retrieve nahi karta.
 
 ---
 
-## Part 3 — The library analogy
+## 3. Crawling
 
-| Employee | Task | Search engine equivalent |
-|---|---|---|
-| **1** | Fetch all the books to a central table | **CRAWLER** |
-| **2** | Sort them into sections — Hindi, English, History, Science, Maths, novels | **INDEXING** |
-| **3** | Sit at reception; fetch requested books quickly | **RANKING** |
+Crawler, spider ya bot public web pages visit karta hai. Ye page ka HTML/structure read karke information extract karne ki koshish karta hai:
 
-> Employee 3 can only be fast **if indexing and ranking were done well.** Frequently requested books sit at the top and are retrieved instantly; rarely requested ones take time.
+- title
+- headings/content
+- page type
+- keywords/context
+- creation/update signals
+- outgoing links
+- linked domains/pages
+
+Crawler collected signals search engine ko provide karta hai.
+
+### 3.1 Crawling ka link-following model
+
+Suppose `example.test` page mein `another.test` ka public link hai:
+
+1. Crawler first site visit karta hai.
+2. Page ka link discover karta hai.
+3. Link follow karke second site/page scan karta hai.
+4. New pages ko index queue mein add karta hai.
+
+Isi link graph ke through crawlers bahut large web discover karte hain.
+
+### 3.2 Crawling continuous hoti hai
+
+Web pages update/delete hoti rehti hain. Search engines periodically revisit karte hain, lekin revisit timing guaranteed nahi hoti. Isliye search result:
+
+- current ho sakta hai,
+- old cached/indexed version ho sakta hai,
+- page delete hone ke baad bhi kuch time visible reh sakta hai.
+
+OSINT mein timestamp aur source freshness document karo.
 
 ---
 
-## Part 4 — A worked crawl
+## 4. Indexing
 
+Billions of pages ko raw storage ke roop mein rakhna enough nahi. Search engine extracted information ko organize karta hai, jaise library mein:
+
+- books collect karna = crawling
+- subject/section mein organize = indexing
+- reader ko requested book dena = ranking/retrieval
+
+Index mein page ke signals ho sakte hain:
+
+- title
+- description/snippet
+- keywords
+- content type
+- related links
+- incoming/outgoing link information
+
+Search engine har page ka exact current full content guarantee nahi karta. Index entry partial/stale ho sakti hai.
+
+---
+
+## 5. Ranking
+
+Ranking query ke liye results ko relevance/quality signals ke basis par order karti hai. User first page par jo dekhta hai wo complete web nahi hota.
+
+OSINT search mein:
+
+- page 1 ke baad results check karo,
+- date filter use karo,
+- multiple sources cross-check karo,
+- result ko evidence samjho, final truth nahi.
+
+Low-ranked result useful ho sakta hai; high-ranked result wrong/stale bhi ho sakta hai.
+
+---
+
+## 6. `robots.txt`
+
+Website root par common file:
+
+```text
+https://example.test/robots.txt
 ```
-1. mywebsite.com is hosted
-2. Crawler arrives → reads title, description, content type, structure
-3. Builds a keyword list:  apple, banana, pear
-4. Hands data to the search engine
-5. Search engine stores it on its local server
-6. User searches "strawberry" → engine consults the index → returns the page
-```
 
-**Crawling never stops.** On the next visit the crawler finds a **link to `anotherwebsite.com`**, follows it, crawls that site too (`tomato, strawberry, pineapple`), and adds it to the index.
+`robots.txt` crawler instructions provide kar sakti hai.
 
-### Crawlers multiply
+Example:
 
-> **"One crawler can MULTIPLY itself."** It was crawling `mywebsite.com`; it **generated a second crawler** for `anotherwebsite.com` and left it there.
-
-This is how **billions of sites** get indexed from a handful of starting points.
-
----
-
-## Part 5 — `robots.txt`
-
-> **"Every hacker's favourite file."** The first thing checked on any target.
-
-### What it is
-
-> When a crawler arrives, **the FIRST thing it checks is whether `robots.txt` exists in the ROOT DIRECTORY.**
->
-> Its job: **specify which content should be crawled and which should not.**
-
-### The format
-
-```
+```text
 User-agent: *
 Disallow: /admin/
 Allow: /public/
@@ -135,332 +147,359 @@ Crawl-delay: 10
 
 | Directive | Meaning |
 |---|---|
-| **`User-agent`** | Which crawler this applies to. **`*`** = all. A name (`Bingbot`, `Amazonbot`) = only that one |
-| **`Disallow`** | Do **not** crawl this path |
-| **`Allow`** | Crawl **only** this. Without it, everything not disallowed is crawled |
-| **`Crawl-delay`** | Wait N seconds between requests — useful if the server is slow |
+| `User-agent` | Kis crawler/bot par rule apply; `*` all bots |
+| `Disallow` | Listed path crawl na karne ki request |
+| `Allow` | Specific path crawl allow/override context |
+| `Crawl-delay` | Requests ke beech delay request |
 
-### ⚠ The mistake that makes it valuable to attackers
+### 6.1 `robots.txt` security boundary nahi hai
 
-> **`robots.txt` is NOT a place to hide private information.** It only *tells* crawlers what to skip.
->
-> **But developers make exactly this mistake** — they list **private paths** under `Disallow`: an admin page, a hidden directory, a backup location.
+`robots.txt` access control nahi. Ye browsers/attackers ko path access se technically nahi rokta. Agar sensitive path ko `Disallow` mein likh diya:
 
-**The result:** a publicly readable file that **advertises exactly which paths the owner considers sensitive.**
+```text
+Disallow: /private-backup/
+Disallow: /old-admin/
+```
 
-**Two properties make it trivial to find:**
+to public file khud un paths ko advertise kar sakti hai.
 
-1. Always at a **fixed location** — `/robots.txt`
-2. **Anyone can read it**, not just crawlers
+Correct protection:
 
-> Paths found here can then be probed, brute-forced or enumerated.
+- authentication/authorization,
+- server access control,
+- remove unused files,
+- network restrictions,
+- proper permissions.
+
+OSINT analyst ke liye `robots.txt` public clue hai, invitation to bypass nahi.
 
 ---
 
-## Part 6 — Sitemaps
+## 7. Sitemaps
 
-### The problem
+Complex website crawl karte waqt links missing/looping hone se crawler pages skip kar sakta hai. Sitemap site structure ko clearer banata hai.
 
-A crawler navigating a tangled site wanders in circles, **takes a long time, and may SKIP pages entirely.**
-
-### The solution
-
-An explicit map of the structure:
-
-```
-example.com
-├── About
-├── Contacts
-└── Category
-    └── Subcategory
-        ├── Product 1
-        └── Product 2
-```
-
-> *"Its work is easier and our work is easier too."*
-
-### Two types
+### 7.1 HTML vs XML sitemap
 
 | Type | Audience | Purpose |
 |---|---|---|
-| **HTML sitemap** | **Users** | Smooth navigation — find contact, login, home |
-| **XML sitemap** | **Crawlers** | Gives the crawler the **exact structure** |
+| HTML sitemap | Human users | Navigation/sections locate karna |
+| XML sitemap | Crawlers | URLs/site structure discover karwana |
 
-**For OSINT:** `sitemap.xml` is a **map of the entire site handed to you**, including pages not linked from anywhere obvious.
+Common location:
+
+```text
+https://example.test/sitemap.xml
+```
+
+OSINT mein sitemap se public pages identify ho sakte hain jo normal navigation mein obvious nahi. Sitemap hidden/private data protection nahi; listed URL par proper access control required hai.
 
 ---
 
-## Part 7 — Google Dorking
+## 8. Google Dorking kya hai?
 
-### The name
+Google Dorking ka meaning advanced search operators ke through query ko tune karna hai. “Dork” yahan query/operator pattern ke sense mein use hota hai.
 
-**Google** + **Dork** — where a *dork* is a **query** or **query operator**.
+Basic search:
 
-### Where it sits
-
-| | **Black box** | **White box** |
-|---|---|---|
-| You know | **Nothing** — a URL or IP only | The **source code** and internal detail |
-| Location | External | Usually inside the company |
-| Task | Gather info → find vulnerabilities → **report** | Test the code → find bugs → report |
-
-> **Google Dorking is BLACK BOX testing.**
-
-### The core idea
-
-> **"After TUNING UP our search query, we will find some more information [hidden] as well."**
->
-> If you tune the query well, **sensitive information the developer never imagined would be reachable becomes reachable.**
-
----
-
-## Part 8 — The operators
-
-| Operator | Restricts to | Example |
-|---|---|---|
-| **`site:`** | a domain or TLD | `site:*.edu` |
-| **`inurl:`** | text in the **URL** | `inurl:admin` |
-| **`intitle:`** | text in the **page title** | `intitle:"index of"` |
-| **`intext:`** | text in the **page body** | `intext:password` |
-| **`filetype:`** | a **file extension** | `filetype:pdf` |
-| **`" "`** | **exact string** match | `"index of"` |
-| **`after:`** | results **after a date** | `after:2020` |
-
-**On `intext:`** — *"however many web pages there are inside the website, wherever it sees that TEXT, it will search for it."*
-
-### Understanding the URL parameter
-
-```
-google.com/search?q=best+laptop
+```text
+security training
 ```
 
-> **`q=` is the query parameter; `+` is an encoded SPACE.** Recognising that search itself is just a parameterised request is the mental shift that makes dorking make sense.
+Tuned query:
 
----
-
-## Part 9 — Worked dorks
-
-### Domain and URL filtering
-
-```
-site:*.com inurl:india          # .com sites with "india" in the URL
-site:*.com inurl:hack
-site:*.edu inurl:india          # educational domains only
+```text
+site:example.test filetype:pdf "security training"
 ```
 
-### Finding documents
+Search engine index ke andar scope/filter narrow hota hai.
 
-```
-site:*.com filetype:pdf hacking for dummies
-site:*.com "networking" filetype:ppt
-```
+### 8.1 Black-box context
 
-> Legitimate everyday use: *"if I quickly had to make a PPT, I can go from here."*
-
-### Finding open FTP servers
-
-```
-intitle:"index of" inurl:ftp
-intitle:"index of" inurl:ftp after:2020     # filter out stale results
-```
-
-### Finding exposed log files
-
-```
-inurl:username filetype:log
-```
-
-**Why logs matter** — this maps to **OWASP Top 10: Security Logging and Monitoring Failures.**
-
-> Logs record every login, logout and action on a server. They are **regularly monitored** and backed up. **If log files are openly readable on the internet, that is reportable.**
-
-### Finding exposed email lists
-
-```
-filetype:xls [company keyword]
-```
-
-> A company saved emails in an **Excel file**, shared it, and **it is still on the internet** — a full employee email list is a **sensitive information leak.**
-
-### Finding default server pages
-
-```
-intitle:"Ubuntu" "index page"
-```
-
-> Indicates a web server deployed **without OS hardening** — the default page was never removed.
-
-### Finding exposed admin panels
-
-```
-intitle:"index of" inurl:phpmyadmin
-```
-
-In the live demo this surfaced a site with `token.php`, `translator.php` and **readable PHP source** in an open directory.
-
-> **"The BEST thing for you will be to REPORT it."**
-
----
-
-## Part 10 — ⚠ The ethical boundary, restated
-
-> **"INFORMATION COLLECTION IS NOT THE OFFENCE."** The offence is what you do next.
-
-### The trainer's repeated instruction
-
-| Situation | Correct action |
+| Black box | White box |
 |---|---|
-| You find an open FTP server | **Find their email and REPORT it** |
-| You find exposed logs | **Report it** |
-| You find an open admin panel | **Report it** |
-| You find leaked emails | **Try to report it** |
+| External/public view | Source code/internal access available |
+| Target behavior/content observe | Internal code/config review |
+| Dorking/OSINT commonly yahan | Authorized code/security testing |
 
-> **"Do not misuse it. If you misuse it, you can land in serious problems."**
-
-### Realistic expectations
-
-Three honest caveats given during the live demo:
-
-1. **Most results are stale.** *"The information you find is lying there from long before; it won't even be active now."* One result dated from **2005**.
-2. **Most results are noise.** *"Out of 100, 80 or 90 websites you find will be FAKE."*
-3. **It is slow work.** *"You have to work quite hard, do a lot of research, and continuously investigate whether it is right or wrong."*
-
-### Search all the pages
-
-> **Don't stop at page one.** The thing you're looking for may be **poorly ranked and far behind.**
->
-> *"It's possible that what you are trying to find is among your 200 results — maybe the LAST two — and all the rest are fake."*
+Google Dorking black-box information gathering ka part ho sakti hai. Ye vulnerability exploitation nahi; public indexed information discovery hai. Finding ko access-control bypass ya data misuse mein convert nahi karna.
 
 ---
 
-## Part 11 — Tools mentioned
+## 9. Core search operators
 
-### Google's date filter
+### 9.1 `site:`
 
-**Tools → Any time →** Past hour / Past week / Past month / Past year / **Custom range**
+Specific domain/TLD scope:
 
-> Described as *"also an ADVANCED FEATURE"* — essential for separating live findings from decade-old noise.
-
-### The Google Hacking Database (GHDB)
-
-A public, community-submitted collection of dorks — **7,600+ entries**.
-
-> *"You can use them one by one according to your requirement."* Also searchable as **"Google Dorks cheat sheet."**
->
-> **"And if you want, you can BUILD YOUR OWN."** — which is the entire point of teaching the mechanics first.
-
----
-
-## Part 12 — ⚠ On script kiddies
-
-Triggered by a learner asking how to find someone's phone number. The answer is the most direct passage in the course.
-
-### The claim
-
-> **"In India, professional ethical hackers are 30%; the other 70% are UNGUIDED"** — no knowledge, *"whatever they got, they picked it up and copy-pasted it."*
-
-### Script kiddie vs professional
-
-| | **Script kiddie** | **Professional ethical hacker** |
-|---|---|---|
-| Knowledge | Copy-pastes without understanding | Collects info, then **develops skills for their domain** |
-| Judgement | **Doesn't know right from wrong** | Knows **which information is how sensitive**, who should have it, and the **consequences of misuse** |
-| Measure of success | *"I hacked a Facebook/Instagram account"* | Structured testing and reporting |
-| Outcome | *"They end up in jail, not knowing anything"* | A career |
-
-### The blunt version
-
-> **"If someone feels 'I am an ethical hacker, but I couldn't hack Facebook, so I am not a hacker' — then YOU CAN LEAVE THIS CLASS."**
->
-> **"This channel is NOT for those who have come only to become script kiddies."**
-
-### The path instead
-
-> After the basics, **specialise**: networking, network security, cloud security, or bug bounty. **Upgrade yourself accordingly.**
->
-> **"If you just remain a script kiddie, then YOU ARE A VERY DANGEROUS PERSON TO ANYONE"** — *"because you are not a professional and you don't know what is right and wrong."*
-
----
-
-## Part 13 — Complete cheat sheet
-
+```text
+site:example.test security
+site:*.edu "research"
 ```
-# ---- how it works ----
-Crawling  →  Indexing  →  Ranking
-Not crawled → not indexed → never in results
 
-# ---- reconnaissance files ----
-target.com/robots.txt      # what the owner tells crawlers to SKIP
-target.com/sitemap.xml     # the full site structure
+Real target ke liye explicit authorization/scope maintain karo. Public search engine query kisi domain ko own nahi banati.
 
-# ---- operators ----
-site:example.com           # restrict to a domain
-site:*.edu                 # restrict to a TLD
-inurl:admin                # text in the URL
-intitle:"index of"         # text in the page title
-intext:password            # text in the page body
-filetype:pdf               # by file extension
-"exact phrase"             # exact string
-after:2020                 # date filter
+### 9.2 `inurl:`
 
-# ---- common dorks ----
-site:*.com filetype:pdf "book title"
-site:*.com "networking" filetype:ppt
+URL mein text filter:
+
+```text
+site:example.test inurl:docs
+site:example.test inurl:login
+```
+
+### 9.3 `intitle:`
+
+Page title mein phrase:
+
+```text
+intitle:"index of"
+site:example.test intitle:documentation
+```
+
+### 9.4 `intext:`
+
+Page body/text mein term:
+
+```text
+site:example.test intext:"contact"
+```
+
+### 9.5 `filetype:`
+
+Indexed file extension:
+
+```text
+site:example.test filetype:pdf
+site:example.test filetype:ppt security
+```
+
+Public document ko access milne ka matlab unrestricted redistribution nahi. Sensitive document mile to copy/share na karo; owner/security contact ko report karo.
+
+### 9.6 Exact phrase quotes
+
+```text
+"exact phrase"
+```
+
+Phrase ke words ko exact sequence mein search karne ka intent.
+
+### 9.7 Date filter
+
+```text
+after:2020
+```
+
+Ya Google UI:
+
+```text
+Tools -> Any time -> Custom range
+```
+
+Date filter result freshness improve kar sakta hai, but page publication/update date always reliable nahi hoti.
+
+---
+
+## 10. Search URL parameter ka basic idea
+
+Search URL mein query parameter ho sakta hai:
+
+```text
+https://www.google.com/search?q=security+training
+```
+
+- `q=` query parameter hai.
+- `+` URL-encoded space ki tarah appear ho sakta hai.
+
+Is mental model se dorking samajhna easy hota hai: aap search text ke saath operators/filters add kar rahe ho, na ki koi hidden exploit run kar rahe ho.
+
+---
+
+## 11. Transcript ke worked dork patterns
+
+Live demo mein trainer kuch public-exposure categories dikhate hain. In patterns ko sirf owned demo domain, published training scope ya passive review ke liye samjho:
+
+```text
 intitle:"index of" inurl:ftp
 intitle:"index of" inurl:ftp after:2020
 inurl:username filetype:log
-filetype:xls [company]
+filetype:xls company-keyword
 intitle:"Ubuntu" "index page"
 intitle:"index of" inurl:phpmyadmin
-
-# ---- resources ----
-Google Hacking Database (GHDB) — 7,600+ dorks
-"Google Dorks cheat sheet"
-Google Tools → Any time → Custom range
 ```
 
----
+Inka analytical meaning:
 
-## Part 14 — Self-check questions
+- `intitle:"index of" inurl:ftp` — open directory/FTP-style listings ke public index results.
+- `after:2020` — stale results ko reduce karne ka attempt; freshness guarantee nahi.
+- `inurl:username filetype:log` — publicly indexed log-like files; logs mein usernames/paths/timestamps leak ho sakte hain.
+- `filetype:xls company-keyword` — public spreadsheets; accidental employee/contact disclosure check.
+- `intitle:"Ubuntu" "index page"` — default server page/hardening gap ka possible signal.
+- `intitle:"index of" inurl:phpmyadmin` — exposed admin-interface/index result ka possible signal.
 
-1. Why does the trainer refuse to teach dorking in 15 minutes?
-2. What is the diagnostic failure a beginner hits when dorking an unindexed site?
-3. Define a search engine. Roughly what share of use is Google's?
-4. Name the three background stages and what each does.
-5. What does a crawler extract from a page? What is a crawler also called?
-6. What does a search engine actually store — the whole page, or what?
-7. State the visibility chain in three steps.
-8. Map each library employee to a search-engine stage.
-9. Trace a full crawl of a new site, from hosting to a user's search result.
-10. What does it mean that crawlers "multiply"?
-11. Where is `robots.txt` always found? Who can read it?
-12. Explain `User-agent`, `Disallow`, `Allow` and `Crawl-delay`.
-13. What mistake do developers make with `robots.txt`, and why is it so useful to an attacker?
-14. What problem does a sitemap solve? Difference between HTML and XML sitemaps?
-15. Break down the term "Google Dorking." What is a dork?
-16. Distinguish black box from white box testing. Which does dorking belong to?
-17. Give the purpose of `site:`, `inurl:`, `intitle:`, `intext:`, `filetype:`, `" "` and `after:`.
-18. Write dorks for: PDFs on a topic; open FTP servers since 2020; exposed log files; leaked spreadsheets; open phpMyAdmin.
-19. Which OWASP Top 10 category do exposed logs relate to?
-20. State the ethical rule in one sentence. What is the correct action on finding an exposure?
-21. Give three realistic limitations of dorking observed during the live demo.
-22. Why must you search beyond page one?
-23. What is the GHDB and how many entries does it hold?
-24. Contrast a script kiddie with a professional on knowledge, judgement and outcome.
+Result milne par login, brute force, upload, source-code extraction ya directory traversal try nahi karna. URL, timestamp, high-level finding note karke owner/security contact ko responsible report do.
 
 ---
 
-## Part 15 — Where this fits
+## 12. Safe, lab-oriented query examples
 
-**Syllabus item 1 of 6 is now complete.**
+Examples ko authorized demo domain ya search-engine documentation context mein use karo:
 
-| # | Topic | Status |
-|---|---|---|
-| **1** | **Advanced search engines / Google Dorking** | ✅ **Done** |
-| 2 | Image analysis & geolocation | next |
-| 3 | Emails, phone numbers, personal info | |
-| 4 | Social media OSINT | |
-| 5 | Website intelligence | |
-| 6 | Steganography | |
+### Domain/document discovery
 
-A **username enumeration** module was also referenced as coming later — the answer to *"how do I check what's exposed about me?"*
+```text
+site:example.test filetype:pdf "annual report"
+site:example.test filetype:ppt training
+```
+
+### URL/title patterns
+
+```text
+site:example.test inurl:docs
+site:example.test intitle:documentation
+```
+
+### Public directory listing awareness
+
+```text
+site:example.test intitle:"index of"
+```
+
+Actual internet target par result mile to:
+
+1. Data download/browse minimally.
+2. Sensitive material ko copy/share na karo.
+3. URL, timestamp aur high-level evidence note karo.
+4. Responsible disclosure contact use karo.
+5. Scope/authorization unclear ho to stop karo.
+
+### 11.1 Transcript ke exposure categories
+
+Trainer examples mein exposed FTP/directory listings, log files, spreadsheets, default pages aur admin panels discuss hote hain. Ye examples public exposure risk samjhane ke liye hain, unauthorized access invitation nahi.
+
+- Open directory/index — sensitive files list ho sakti hai.
+- Logs — usernames, paths, timestamps/IPs leak kar sakte hain.
+- Spreadsheet — public employee/contact list unintended disclosure ho sakti hai.
+- Default server page — hardening/configuration incomplete signal ho sakta hai.
+- Admin panel/source file — high-risk exposure; report karo, exploit nahi.
+
+---
+
+## 13. Ethical boundary
+
+Trainer ka repeated rule:
+
+> **Information collect karna aur uska misuse karna alag cheezein hain.**
+
+Correct response:
+
+| Finding | Responsible action |
+|---|---|
+| Public FTP/directory exposure | Owner/security contact ko report |
+| Public logs | Sensitive content retain/share na karo; report |
+| Admin panel exposed | Access attempt na karo; report |
+| Public email spreadsheet | Download/distribute na karo; report |
+| Stale/false result | Verify karke uncertainty document |
+
+OSINT mein “can see” ka matlab “can exploit” nahi.
+
+### 12.1 Querying vs exploitation
+
+Public search query se indexed page ka result dekhna aur login bypass, brute force, file upload, code execution ya data extraction karna completely different activity hai. Course ka focus public-information methodology aur responsible reporting hai.
+
+---
+
+## 14. Dorking ki practical limitations
+
+Live search mein three realistic problems:
+
+1. **Stale data** — result years old ho sakta hai; page/resource ab active nahi.
+2. **Noise/false positives** — 100 results mein majority irrelevant/fake/unrelated ho sakte hain.
+3. **Time-consuming verification** — each result ko source, date, ownership aur context se check karna padta hai.
+
+Page one par stop mat karo, lekin page 200 ke har result ko blindly open bhi mat karo. Query refine karo:
+
+- domain narrow,
+- phrase exact,
+- filetype/date filter,
+- language/region filter,
+- source cross-check.
+
+---
+
+## 15. Google tools aur GHDB
+
+Google search interface mein:
+
+```text
+Tools -> Any time -> Past hour/week/month/year/Custom range
+```
+
+Date filter old noise reduce kar sakta hai.
+
+**Google Hacking Database (GHDB)** community-maintained dork examples ka collection hai. Isko learning/reference ke roop mein use karo:
+
+- query ka logic samjho,
+- authorized lab/domain par test karo,
+- blindly live target par run karke result exploit na karo,
+- query ko current engine behavior ke against verify karo.
+
+Dorking ka real skill pre-written strings copy karna nahi, requirement ke hisaab se safe query design karna hai.
+
+---
+
+## 16. Script-kiddie warning
+
+Trainer un learners ko caution karte hain jo “hacking” ko social accounts break karna ya copy-paste tools run karna samajhte hain.
+
+Professional OSINT researcher:
+
+- scope/authorization document karta hai,
+- public sources ko correlate karta hai,
+- uncertainty accept karta hai,
+- evidence/source/timestamp record karta hai,
+- responsible report deta hai.
+
+Script-kiddie behavior:
+
+- tool/query ka purpose samjhe bina copy-paste,
+- public data ko private target ke against misuse,
+- result verify na karna,
+- harm/legal consequence ignore karna.
+
+Fundamentals ke baad networking, cloud, threat intelligence, bug bounty ya web security jaise domain mein specialize karna better path hai.
+
+---
+
+## 17. Day 2 self-check questions
+
+1. Search engine ke crawling, indexing aur ranking stages explain karo.
+2. Non-crawled page dork search mein kyu nahi mil sakta?
+3. `robots.txt` kya karta hai aur security control kyu nahi hai?
+4. `Disallow`, `Allow`, `User-agent` aur `Crawl-delay` ka meaning batao.
+5. HTML sitemap aur XML sitemap mein difference kya hai?
+6. Google Dorking ko black-box OSINT kyu kehte hain?
+7. `site:`, `inurl:`, `intitle:`, `intext:` aur `filetype:` ke examples do.
+8. Exact phrase quotes aur `after:` ka use kya hai?
+9. Public log/spreadsheet/admin panel mile to responsible response kya hoga?
+10. Dorking ke stale data, noise aur verification limitations kya hain?
+11. Search result page one se aage dekhna kyu useful hai?
+12. GHDB kya hai aur pre-written dorks ko kaise safely use karoge?
+13. Search URL mein `q=` aur `+` ka broad meaning kya hai?
+14. Querying aur exploitation ke beech ethical difference explain karo.
+15. Script-kiddie aur professional OSINT workflow compare karo.
+
+---
+
+## 18. Final takeaway
+
+- Search result milliseconds mein aata hai, lekin crawling/indexing/ranking background mein hoti hai.
+- Non-crawled/non-indexed content search engine se retrieve nahi hota.
+- `robots.txt` public crawler instruction hai, access-control mechanism nahi.
+- Sitemaps public URL structure expose kar sakte hain.
+- Dorking operators search index ko scope/filter karte hain; ye authorization bypass nahi.
+- `site:`, `inurl:`, `intitle:`, `intext:`, `filetype:`, exact phrases aur date filters powerful but noisy tools hain.
+- Public exposure mile to data misuse ke bajay responsible disclosure karo.
+- Search results stale/false ho sakte hain; source, timestamp aur independent verification mandatory hai.
+
+OSINT Day 3 mein image intelligence, EXIF/metadata, reverse image search aur geolocation methodology continue hogi.

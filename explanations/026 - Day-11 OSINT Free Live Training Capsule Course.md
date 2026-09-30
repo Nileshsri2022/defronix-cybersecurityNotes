@@ -1,81 +1,294 @@
-# Explanation — OSINT Day 11: Live Lab Solve (the "Sakura"-style OSINT room)
+# OSINT Day 11 — Applied Investigation Lab: Metadata, Username Pivots, GPG aur Blockchain (Hinglish Explanation)
 
-**Lecture:** 026 — Day 11, OSINT Free Live Training Capsule Course
-**Translation:** [`english/026 - Day-11 OSINT Free Live Training Capsule Course.md`](../english/026%20-%20Day-11%20OSINT%20Free%20Live%20Training%20Capsule%20Course.md)
-**Builds on:** everything so far (image forensics, username pivots, Twitter tradecraft) · **Continues to:** Day 12 — lab tasks 5 & 6 + a harder OSINT room
-
----
-
-## Part 1 — Why a lab session
-
-Students had been asking for hands-on tasks instead of passive video-following. The instructor obliges with a beginner/medium **TryHackMe-style OSINT investigation room** walked through live. Two stated purposes: (1) prove that the techniques from Days 2–10 chain together end-to-end; (2) give everyone a legal, info-rich, permanent practice target (labs stay up even if platforms update — "the techniques remain roughly the same").
-
-Format: staged investigation text + hints + questions that must be answered to progress.
+**Source transcript:** `transcripts/026 - Day-11 OSINT Free Live Training Capsule Course [ Hindi ].hi-orig.srt`
+**Trainer in transcript:** Nitesh Singh (Defronix)
+**Builds on:** OSINT Days 1–10 — image analysis, usernames, Twitter/X, Facebook/LinkedIn aur correlation
+**Continues:** Day 12 mein lab ke remaining tasks, BSSID/geolocation aur airport clues
+**Lab context:** Transcript ek beginner/intermediate TryHackMe-style public training room ko live solve karta hai.
+**Note:** Ye exact matching Hindi transcript ko context ke saath samajh kar likha gaya hai; ye literal translation nahi hai. Lab artifacts ko isolated practice room ke bahar access, credential use, cryptocurrency transfer ya dark-web searching ke liye apply mat karo.
 
 ---
 
-## Part 2 — Task chain as solved live
+## 1. Theory se practical chain tak
 
-### Stage A — image forensics → the username
-- Scenario text: no major breach damage, but forensics found **an image left behind by the criminals**. Hint language: information lives "beneath the surface" of files.
-- Technique: open the image + **`exiftool`**; the file's **export path** (`/home/<username>/Desktop/…`) survived in the metadata — the attacker forgot to scrub it (or left it as a boast). The path's home-directory component = **a username** (the transcript only preserves that it ended in "…Angel").
-- **Pivot #1:** Google the username → **Twitter account**, an article byline, and an **Instagram page**. Q1 (*what username does the attacker go by?*) solved.
+Learners ne repeatedly practical tasks maange the. Aaj ek staged OSINT room solve hota hai jisme har question previous finding par depend karta hai.
 
-### Stage B — OpSec autopsy (the two fatal mistakes)
-The lab itself narrates them; the instructor unpacks the doctrine:
-1. **Catalogue hygiene** — metadata left in an uploaded/"trophy" artifact.
-2. **Username reuse across platforms** — one unique handle makes cross-platform correlation trivial ("most digital platforms make it easy to find other accounts owned by the same person when the username is unique"); job/community sites then leak **real-world identity** (full name, location).
-- Twitter sweep (Days 6–8 tradecraft): 21 followers / 1 following (Microsoft), tweets disclosing habits (meet-up reminders, phone upgrades, "regular Wi-Fi and passwords"), dark-web boasting ("anyone who wants them will have to do a real deep search"), a vanished paste page ("last page got removed when the website changed domains"), a **self-introduction tweet containing a second, different @handle**, and **travel/season clues** — "cherry blossom season," "close to home, can't wait to finally be back," "taking out some last-minute cherry blossom" — i.e. seeds for the later **geolocation** answer.
-- Identity questions solved here: full email (next stage) and **full real name** (recovered from the pivot set).
+```text
+Image artifact
+  -> metadata/export path
+  -> username
+  -> public social accounts
+  -> identity/email clues
+  -> GitHub/GPG metadata
+  -> audit history
+  -> blockchain explorer
+  -> image/geolocation clues
+```
 
-### Stage C — GitHub → GPG → email
-- The username pivot also exposes a **GitHub account**: a hello-world Java repo, a suspicious "worker ID/password" file, a **PGP repo**, and a **Bitcoin repo**.
-- Technique taught: **PGP/GPG public keys embed identity metadata.** Copy the repo's public key (`Raw` → save as `public.key`) → **`gpg --import public.key`** → the import output **displays the email address** bound to the key. Q (*full email address used by the attacker*) solved.
-
-### Stage D — audit history & crypto
-- New scenario turn: *the criminal knows he's being hunted and has scrubbed things.* Teaching point: **platforms retain revision/audit history** — information included by mistake and later deleted remains recoverable via a "deeper dive" into the GitHub account (edited/removed commits/files).
-- Remaining live questions: **the wallet address** and **which mining pool paid him on 23 January 2021** — answered by tracing the Bitcoin/Ethereum artifact through a **block explorer** (transaction IDs → values, tokens, counterparties). The instructor demos the explorer hopping (one explorer rejects the identifier, another resolves it) and the from/to value columns, then **stops deliberately**.
+Room text hints deta hai aur next question unlock karne ke liye answer submit karna hota hai. Ye safe practice target hai; real attack victim nahi.
 
 ---
 
-## Part 3 — Homework (the real point of the session)
+## 2. Stage A — Image forensics se username
 
-Before answers to the crypto/geolocation questions are revealed next class, students must produce:
+### 2.1 Lab clue
 
-1. **Full Twitter OSINT** on the attacker's (newly-renamed, post-attack) account — every tweet read and interpreted; **reverse-image search** every image; **Twitter advanced-search operators** (Days 6–7) where useful.
-2. **Geolocate the attacker** from the assembled clues (the cherry-blossom photos etc.).
-3. A **written report** + the outstanding answers (wallet address; mining pool of 23 Jan 2021).
+Forensic analysis mein major damage nahi mila, lekin compromised system par criminal ka छोड़ा hua image artifact mila. Hint ka meaning hai ki information **surface ke neeche** ho sakti hai.
 
-Participation reality-check: out of 11 live attendees only 3 volunteer — prompting the recurring pep talk: this complete course is free, labs are free, and real targets never expose this much.
+Image ko visually dekhna enough nahi. File metadata inspect karo:
+
+```bash
+exiftool image.png
+```
+
+Possible fields:
+
+- file type/size,
+- image dimensions,
+- software/exporter,
+- timestamps,
+- comments,
+- original/export path.
+
+Transcript mein export path home directory tak preserve hota hai, jaise:
+
+```text
+/home/<username>/Desktop/...
+```
+
+Home-directory segment username ka lead deta hai. Lab transcript mein username ka ending “Angel” jaisa clue sunai deta hai; exact answer lab ke supplied artifact/source se verify karo.
+
+### 2.2 Technical correction
+
+- Metadata present hona file author prove nahi karta.
+- Path old machine/user/exporter ka ho sakta hai.
+- Metadata edit/remove/fake ki ja sakti hai.
+- Same username many people use kar sakte hain.
+
+Report mein “metadata says” aur “independently confirmed” alag fields rakho.
 
 ---
 
-## Part 4 — Techniques-to-syllabus mapping
+## 3. Stage B — Username pivot aur OPSEC mistakes
 
-| Lab step | Technique | Where taught |
+Lab username ko public web search se pivot karta hai:
+
+```text
+"candidate username"
+site:x.com "candidate username"
+site:instagram.com "candidate username"
+```
+
+Transcript mein same/related username se Twitter/X account, article byline aur Instagram page milne ka example hai.
+
+### 3.1 Do OPSEC mistakes
+
+1. Image/file metadata scrub na karna.
+2. Same unique username multiple platforms par reuse karna.
+
+Unique handle cross-platform correlation ko easy banata hai. Job/community sites kabhi full name/location jaise voluntarily public fields show kar sakti hain.
+
+### 3.2 Defensive self-audit
+
+Apne authorized accounts ke liye:
+
+- uploaded images ka EXIF review,
+- unique username reuse inventory,
+- old bios/posts cleanup,
+- separate work/personal handles,
+- privacy/audience settings,
+- image upload pipeline metadata stripping
+check karo.
+
+Kisi real person ke cross-platform account ko harass/track karne ke liye pivot mat use karo.
+
+---
+
+## 4. Stage B — Twitter/X timeline analysis
+
+Lab account ke public footprint mein followers/following, posts, travel/season clues, public Wi-Fi/password boast aur another handle mention jaise leads discuss hote hain.
+
+Safe analysis framework:
+
+| Signal | What it can support | What it cannot prove |
 |---|---|---|
-| Image → export path | metadata / exiftool | Days 3–5 (image analysis) |
-| Google the username from metadata | username pivot | Day 8 (URL/username lesson), Day 10 (name sweeps) |
-| Twitter account analysis | traditional + advanced operators | Days 6–8 |
-| Cross-platform identity stitching | social-media OSINT | Days 6–10 |
-| GPG key → email extraction | `gpg --import` key metadata | **new today** |
-| GitHub edited/deleted content | revision/audit-history diving | **new today** |
-| Wallet + mining-pool trace | blockchain explorers | **new today** |
-| Cherry-blossom photos → location | image geolocation | Days 3–5 |
+| Public follower count | Account reach/context | Identity/authenticity |
+| One following relationship | Public connection lead | Friendship/role |
+| Travel/cherry-blossom post | Season/location hypothesis | Current location |
+| Second @handle | Cross-platform lead | Same person without verification |
+| Password boast | Credential-exposure risk | Permission to retrieve/use password |
 
-## Part 5 — Admin
+Lab question may ask real name/email. Answer supplied room data and reputable public source se verify karo; leaked credentials ko copy/use/share mat karo.
 
-- **Next class:** lab tasks **5 & 6** solved with answers in comments; then **one more, harder OSINT room**; then remaining Instagram/OSINT odds and ends; then wind-down decisions.
-- Repeats the guarantee: future topics stay free and equally detailed.
+### 4.1 Search workflow
 
-## Syllabus progress
+```text
+1. Original account URL/hash/timestamp note
+2. Every relevant public post read
+3. Day 6–8 operators use: from:, date, hashtag, language
+4. Images reverse-search
+5. Contradictions and deleted/edited references note
+6. Identity claim only after independent source
+```
 
-| # | Topic | Status |
+---
+
+## 5. Stage C — GitHub se GPG key aur email clue
+
+Username pivot se lab GitHub repository tak pahunchta hai. Transcript mein hello-world code, suspicious-looking worker/password file, PGP/GPG repo aur Bitcoin-related artifact discuss hote hain.
+
+### 5.1 Public key import
+
+Owned lab key/file par:
+
+```bash
+gpg --import public.key
+gpg --list-keys
+gpg --fingerprint
+```
+
+GPG import output/public key UID mein email identity metadata embedded ho sakti hai. Lab question full email pooch sakta hai.
+
+### 5.2 Important security boundary
+
+- Public GPG key import safe cryptographic inspection hai.
+- Private key, password file ya credential ko use/decrypt/login ke liye try mat karo.
+- GitHub repository public hone ka matlab every secret legitimate use ke liye available nahi.
+- Repository owner ko secret exposure responsibly report karo.
+- Email address report mein redact/minimize karo unless challenge explicitly requires answer.
+
+### 5.3 Public key vs private key
+
+| Artifact | Share? | Role |
 |---|---|---|
-| 1 | Advanced search engines / Google Dorking | ✅ Day 2 |
-| 2 | Image analysis & geolocation | ✅ Days 3–5 |
-| 3 | Social media OSINT | ✅ core complete (Twitter, LinkedIn, Facebook) · Instagram still pending |
-| 4 | Emails, phone numbers, personal info | ⏭ announced |
-| 5 | Website intelligence | |
-| 6 | Steganography | |
-| — | **Applied labs** | 🔄 Day 11 (Sakura-style room, tasks 1–4 done live; 5–6 next class) |
+| Public key | Public distribution possible | Encryption/signature verification |
+| Private key | Never share | Secret signing/decryption |
+| Key UID/comment | Metadata lead | Identity hint, not proof |
+
+---
+
+## 6. Stage D — GitHub history aur deleted data
+
+Lab storyline mein attacker ko pata chalta hai ki investigation ho rahi hai aur files/posts scrub kiye gaye. Transcript revision/audit history ko important OSINT source batata hai.
+
+Defensive Git workflow:
+
+```bash
+git log --oneline --all
+ git show <commit>
+ git log --stat --all
+```
+
+Public repository mein old commit/file history still visible ho sakti hai. Lekin deleted secret ko recover karke use karna authorized nahi. Correct security action:
+
+1. Secret exposure confirm minimally.
+2. Do not authenticate with it.
+3. URL/commit hash/time note.
+4. Owner/platform security route report.
+5. Owner rotate/revoke secret.
+
+Git history mein unrelated private data ho sakta hai; bulk clone/archive avoid karo if not needed.
+
+---
+
+## 7. Blockchain artifact aur block explorer
+
+Lab ke remaining questions wallet address aur specific date—23 January 2021—par mining pool/payment trace se related hain. Trainer block explorer se transaction flow inspect karte hain.
+
+### 7.1 Generic workflow
+
+1. Authorized lab-provided public wallet/transaction identifier lo.
+2. Correct chain explorer select karo.
+3. Address/transaction hash search.
+4. From/to, timestamp, amount, token/asset note.
+5. Related transaction graph cautiously follow.
+6. Independent explorer/source se confirm.
+
+```text
+wallet/address -> transaction hash -> from/to -> timestamp/value -> related public entity
+```
+
+One explorer identifier reject kar sakta hai; another chain-specific explorer resolve kar sakta hai. Error ko success samajhkar random chain par search mat karo.
+
+### 7.2 Technical and legal limits
+
+- Wallet address person identity automatically prove nahi karta.
+- Exchange/mining-pool label heuristic ho sakta hai.
+- Transaction timestamp timezone/confirmation context ke saath read karo.
+- Cryptocurrency transaction trace ko fund transfer, seizure ya attribution authority mat samjho.
+- Real wallet/credential/seed phrase ko access/transfer mat karo.
+
+---
+
+## 8. Homework: attacker geolocation
+
+Trainer learners ko remaining crypto answers ke saath full Twitter/X OSINT aur attacker geolocation assignment dete hain.
+
+Method:
+
+- cherry-blossom/travel photos observe,
+- reverse image search,
+- Day 3 foreground/background/map method,
+- Day 6–8 `hashtag`, date, language, geocode concepts,
+- map/satellite/airport evidence,
+- report with confidence and limitations.
+
+A single seasonal post se current home location assume mat karo. Time/date, source freshness aur alternative places compare karo.
+
+---
+
+## 9. Technique-to-syllabus mapping
+
+| Lab step | Technique |
+|---|---|
+| Image → export path | EXIF/metadata, `exiftool` |
+| Username → public accounts | Search and cross-platform pivot |
+| Timeline analysis | Twitter/X manual + advanced search |
+| Public key → email hint | `gpg --import`, key UID metadata |
+| Edited/deleted content | Git commit/revision history |
+| Wallet/mining pool trace | Blockchain explorer |
+| Cherry-blossom photo → place | Reverse image + geolocation |
+
+Ye lab demonstrate karta hai ki OSINT independent tricks ka list nahi, linked evidence chain hai.
+
+---
+
+## 10. Common mistakes aur safety points
+
+1. Image pixels dekhkar metadata check na karna.
+2. Export path username ko confirmed real identity samajhna.
+3. Same username ko same human proof bolna.
+4. Leaked Wi-Fi/password text ko use/test karna.
+5. GitHub password/worker file ko login credential samajhna.
+6. Private GPG key ya seed phrase search/import karna.
+7. Deleted GitHub secret recover karke authenticate karna.
+8. Blockchain wallet ko person identity proof samajhna.
+9. One explorer result ko final attribution bolna.
+10. Public lab target ke bahar same workflow run karna.
+11. Travel photo se real-time/current home location publish karna.
+12. Source URLs, timestamps aur uncertainty document na karna.
+
+---
+
+## 11. Day 11 self-check questions
+
+1. Image metadata mein export path OSINT clue kaise ban sakta hai?
+2. `exiftool` se kaunse fields inspect karoge?
+3. Metadata clue ko independent source se verify kyu karna chahiye?
+4. Username reuse cross-platform risk kya hai?
+5. Lab Twitter timeline se travel/season clue ko location proof kyu nahi maana ja sakta?
+6. Public GPG key aur private key mein difference kya hai?
+7. `gpg --import public.key` ka output kya hint de sakta hai?
+8. Git revision history security investigation mein useful kyu hai?
+9. Exposed GitHub secret milne par responsible action kya hoga?
+10. Blockchain explorer mein from/to/timestamp/value kaise read karoge?
+11. Wallet address aur person identity ke beech attribution limitation kya hai?
+12. Image geolocation homework mein confidence/alternative candidates kyu include karoge?
+13. Applied lab mein previous Days 3–10 techniques kaise chain hoti hain?
+14. Leaked credentials ko access kiye bina finding kaise report karoge?
+
+---
+
+## 12. Continuity
+
+Day 11 ne image metadata se start karke username, social accounts, GPG identity clue, Git history, blockchain aur geolocation ko ek investigation chain mein joda. Day 12 mein lab ke password-cache/BSSID aur airport tasks continue honge; Instagram OSINT bhi roadmap mein enter hoga.

@@ -1,437 +1,761 @@
-# Explanation — Day 7: User & Group Management
+# Day 7 — Kali Linux Capsule Course: User Management + Group Management (Hinglish Explanation)
 
-**Lecture:** 007 — Kali Linux Free Capsule Course, Day 7
-**Translation:** [`english/007 - Kali Linux Free Capsule Course - Day 7.md`](../english/007%20-%20Kali%20Linux%20Free%20Capsule%20Course%20-%20Day%207.md)
-**Shift in topic:** After six sessions of text-processing commands, the course moves into system administration.
-
----
-
-## Part 1 — Why user management exists
-
-### 1.1 The principle of least privilege
-
-An organization has many departments — development, accounts, finance, production. The argument made in class:
-
-- A **developer** needs permissions **only on their project** — what would they do with access to the entire server?
-- Giving the **accounts department** the tech department's file permissions is **not beneficial**.
-- **Unnecessary permission is useless** — and dangerous.
-
-> Each user gets: *"This is your file requirement, this is your area, you have these permissions, work here."*
-
-### 1.2 Why admins don't stay logged in as root
-
-Real system administrators log in as a **normal user**, then use tools to **temporarily become root**, then **exit** again.
-
-**The reasoning — blast radius:**
-
-| Scenario | If a vulnerability is exploited |
-|---|---|
-| Logged in as **normal user** | Only **that user** is compromised; the machine survives |
-| Logged in as **root** | The **entire system** is compromised |
-
-> **"We gave root permission to everyone… so you got your entire machine compromised."**
-
-### 1.3 The root user
-
-| Property | Value |
-|---|---|
-| Also called | super user, admin |
-| **UID** | **0** — always, because root is the first user |
-| Power | **Unlimited** — can remove or delete any file |
-| Can | **Override** any normal user's privileges |
-
-> If root's account is compromised, **the whole system and its control** is gone — you are no longer the owner.
-
-### 1.4 The offensive-security angle
-
-In **CTFs** and **pen testing**, after enumeration and scanning, gaining a shell is only step one. Because a normal user lacks the necessary permission level, **becoming root is the standard follow-up task** — only then can you actually work with the machine.
+**Source transcript:** `transcripts/007 - Kali Linux Free Capsule Course - Day 7 [ Hindi ].hi-orig.srt`
+**Trainer in transcript:** Nitesh Singh (Defronix)
+**Builds on:** Day 6 — `cut`, `awk`, compression aur `tar`
+**Note:** Ye explanation Hindi original transcript ko samajh kar likha gaya hai; ye line-by-line literal translation nahi hai. Auto-captions mein `whoami`, `su`, `UID/GID`, `useradd`, `usermod`, `groupadd`, `/etc/passwd`, `/etc/shadow`, `/etc/default/useradd` aur `/etc/skel` jaise technical words kai jagah garbled mile. Context ke basis par unka intended command/concept restore karke simple Hinglish mein explain kiya gaya hai.
 
 ---
 
-## Part 2 — Identifying users
+## 1. Day 7 ka focus
 
-| Command | Shows |
-|---|---|
-| `whoami` | **Which user you are currently logged in as** |
-| `who` | **Who is logged in**, on which terminal, since when |
-| `w` | **Which user is doing what** — plus idle time |
-| `id` | **UID, GID, and all group memberships** |
-| `id <user>` | The same for a specific user |
+Pichhli classes mein commands ke through text processing aur files ke saath kaam hua. Day 7 se course **system administration** ki taraf move karta hai. Aaj ke major topics hain:
 
-```bash
-whoami           # -> root
-who              # -> kali  tty7  <login time>
-w                # -> kali  logged in 19:13, idle 2m30s, running ...
-id               # -> uid=1000(kali) gid=1000(kali) groups=...
-id manish        # same, for another user
-```
+1. **User management** — users ko identify, create, modify aur delete karna.
+2. **Root/superuser** — root ke paas itni power kyu hoti hai aur root ke roop mein permanently kaam karna risky kyu hai.
+3. **`su` command** — ek user account se doosre account mein switch karna; normal switch aur login shell ka difference.
+4. **User database files** — `/etc/passwd`, `/etc/shadow`, `/etc/default/useradd` aur `/etc/skel`.
+5. **Group management** — primary/secondary groups, group create/modify/delete karna aur user ko group mein add karna.
 
-### Aside: SELinux on Red Hat / CentOS
-
-On Red Hat–family systems, `id` also shows an **SELinux context**. SELinux is an **additional security layer** above the OS that keeps the system **isolated**.
-
-> Its rule model is absolute: **if the rule says yes, the action happens; if it says no, nothing anyone tries will work.**
-
-This strictness is why **industry prefers Red Hat** — tight security policy, layered with firewalls, antivirus, IDS and IPS on top, which makes life difficult for attackers.
+Trainer ka emphasis hai ki sirf commands ratna goal nahi hai. User, UID, GID, home directory, shell aur group membership aapas mein kaise connected hain, ye samajhna Linux administration aur penetration-testing dono ke liye fundamental hai.
 
 ---
 
-## Part 3 — `su` and the login shell concept
+## 2. User management ki zarurat kyu padti hai?
 
-### 3.1 Every user needs an environment
+### 2.1 Har department ko har file ki access nahi chahiye
 
-> **Any user — root or otherwise — needs an *environment* in order to run.** That environment is defined in the machine and consists of **environment variables**.
+Ek organization mein development, accounts, finance, production aur security jaise alag departments ho sakte hain. Har department ka kaam aur required data alag hota hai.
 
-### 3.2 Login shell vs non-login shell
+- Developer ko apne project ki files par kaam karne ki permission chahiye.
+- Accounts team ko technical department ki saari files dene ka koi reason nahi hai.
+- Finance user ko poore server ya poori machine ka access de dena unnecessary hai.
 
-| | **Login shell** | **Non-login shell** |
-|---|---|---|
-| When | A user logs in with username + password | You switch users from within an existing shell |
-| Environment | **Their own** environment variables loaded | **The previous user's** environment is reused |
-| Effect | You genuinely *are* that user | You are only **acting as** that user |
-| Command | `su - <user>` | `su <user>` |
+Is principle ko simple words mein samjho:
 
-### 3.3 The demonstration that answers a student question
+> **Jis user ko jitni access ki zarurat hai, usko utni hi access do — extra permission mat do.**
+
+Isko security mein **least privilege** approach kaha jata hai. Extra permission convenient lag sakti hai, lekin agar account compromise ho gaya to attacker ko wahi extra power mil jayegi.
+
+### 2.2 Normal user se kaam karna safer kyu hai?
+
+Trainer explain karte hain ki system administrator ko normally **privileged/root account se permanently logged in nahi rehna chahiye**. Better workflow hota hai:
+
+1. Normal user ke roop mein login karo.
+2. Jab administrative kaam ho tab temporary privilege elevation ya user switch use karo.
+3. Kaam ke baad wapas normal account par aa jao.
+
+Reason ko blast radius se samjho:
+
+| Situation | Vulnerability exploit hone par risk |
+|---|---|
+| Normal user logged in | Mostly us user ki permissions tak impact limit ho sakta hai |
+| Root logged in | Attacker ko poore system par control mil sakta hai |
+
+Agar system mein vulnerability ho aur humne har jagah root/admin access de rakha ho, to ek chhoti mistake se **poori machine compromise** ho sakti hai. Isliye “root se kaam karna possible hai” aur “root se har waqt kaam karna safe hai” — ye dono alag baatein hain.
+
+---
+
+## 3. Root user aur UID 0
+
+Linux mein ek special privileged account hota hai:
+
+- Iska naam aam taur par **`root`** hota hai.
+- Root ko **superuser** ya administrator bhi kaha jata hai.
+- Root ki **UID hamesha `0`** hoti hai.
+- Root normal users ki permissions ko override kar sakta hai.
+- Root system files ko modify/remove kar sakta hai aur users/groups manage kar sakta hai.
+
+UID ka matlab **User ID** hai. Linux username ko sirf text ke roop mein nahi, balki internally numeric UID ke saath identify karta hai. Root ke case mein woh reserved identity `0` hai.
+
+### Security impact
+
+Agar kisi attacker ko root account mil gaya, to problem sirf ek file ya ek user tak limited nahi rahegi. Wo system configuration, accounts, services aur sensitive data tak pahunch sakta hai. Isliye root compromise ko full-system compromise maana jata hai.
+
+### Pen-testing/CTF context
+
+Trainer offensive-security angle bhi batate hain: enumeration aur scanning ke baad kisi target par normal shell mil jana aksar final goal nahi hota. Normal user ki permissions limited hoti hain, isliye authorized lab/CTF mein next task privilege escalation karke root-level access samajhna hota hai.
+
+> Real systems par ye sab sirf written authorization aur controlled lab ke andar practice karna chahiye.
+
+---
+
+## 4. Current user aur logged-in users check karna
+
+### 4.1 `whoami` — main kaun hoon?
 
 ```bash
-su            # no username given -> defaults to ROOT
+whoami
 ```
 
-After switching, the prompt still showed `/home/kali` rather than `/root`. **Why?**
+Ye current shell mein active username batata hai. Agar output `root` aaye to current shell root identity ke under chal raha hai; agar `kali` aaye to current user `kali` hai.
 
-> You became the **root user**, but you are still using **`kali`'s environment variables** — so the present working directory is still kali's home. You are *acting* as root, not *logged in* as root.
+### 4.2 `who` — kaun-kaun logged in hai?
 
 ```bash
-su - root     # or just: su -
+who
 ```
 
-Now the shift is **permanent** — root's own account, root's own environment variables. **Not acting; actually logged in.**
+Isse logged-in users, unka terminal/session aur login time jaise details mil sakti hain. Transcript mein trainer output se dikhate hain ki `kali` kis terminal, jaise `tty7`, par logged in hai.
 
-> **Memory rule: the dash `-` loads the target user's environment.** Without it you carry your old environment along.
+### 4.3 `w` — kaun kya kar raha hai?
 
-### 3.4 `$SHLVL` — shell level
+```bash
+w
+```
+
+`w` aam taur par `who` se zyada information deta hai: login time, idle time aur current activity/command ka snapshot. Admin ko live system par active sessions samajhne mein ye useful hota hai.
+
+### 4.4 `id` — UID, GID aur groups
+
+```bash
+id
+id manish
+```
+
+- `id` bina username ke current user ki information dikhata hai.
+- `id manish` kisi specific user ki identity information dikhata hai.
+- Output mein UID, primary GID aur group memberships dikh sakti hain.
+
+Typical output ka structure kuch is tarah samjho:
+
+```text
+uid=1000(kali) gid=1000(kali) groups=1000(kali),4(adm),27(sudo)
+```
+
+Exact UID/GID aur groups machine ke hisaab se different honge. Important point hai ki username ke saath numeric identity aur memberships bhi hoti hain.
+
+---
+
+## 5. Red Hat systems mein security context ka note
+
+Trainer batate hain ki Red Hat/CentOS family system par `id` output mein ek additional **security context** bhi dikh sakta hai. Ye **SELinux** se related hota hai.
+
+SELinux operating system ke upar ek additional mandatory access-control layer provide karta hai. Basic idea:
+
+- Agar policy allow karti hai, action allow ho sakta hai.
+- Agar policy deny karti hai, sirf root hone se bhi action automatically allow nahi ho jata.
+
+Is tarah system ko isolate karke permissions ko aur strict banaya ja sakta hai. Trainer isi layered-security model ke context mein Red Hat ki industry usage aur firewall, antivirus, IDS/IPS jaise additional layers ka mention karte hain.
+
+> Ye Day 7 ka introductory context hai; SELinux policy writing ya troubleshooting is class ka main topic nahi hai.
+
+---
+
+## 6. `su` — user account switch karna
+
+`su` ka use ek user account se doosre account mein switch karne ke liye hota hai.
+
+```bash
+su <username>
+```
+
+Agar username specify na kiya jaye, to Linux systems par `su` aam taur par root account ko target karta hai:
+
+```bash
+su
+```
+
+Password prompt aane par target account ka password required ho sakta hai.
+
+Lekin yahan ek important distinction hai: **user identity switch hona** aur **target user ka complete login environment load hona** exactly same cheez nahi hai.
+
+---
+
+## 7. Login shell, non-login shell aur environment
+
+### 7.1 Environment kya hota hai?
+
+Har user ke saath kuch environment variables aur configuration associated hoti hai. Examples:
+
+- `HOME` — home directory
+- `PATH` — commands search karne ki locations
+- `SHELL` — default shell
+- prompt aur shell startup configuration
+
+Jab user machine par username/password ke saath normal login karta hai, system us user ka login environment prepare karta hai.
+
+### 7.2 `su user` — identity switch, purana environment
+
+```bash
+su root
+# ya, root ke liye username omit karke:
+su
+```
+
+Transcript ke demonstration mein `su` ke baad prompt/current directory `/home/kali` hi dikhti hai, `/root` nahi. Iska reason ye samjhaya gaya hai:
+
+- Shell target user, yani root, ki identity ke saath command run kar sakta hai.
+- Lekin current shell ka environment aur working directory pehle wale user se inherited reh sakta hai.
+- Isliye trainer ise target user ki tarah **acting** karna kehte hain, complete fresh login nahi.
+
+`su` ke baad identity verify karne ke liye:
+
+```bash
+whoami
+pwd
+```
+
+### 7.3 `su - user` — target user ka login environment
+
+```bash
+su - root
+# ya root ke liye:
+su -
+```
+
+Dash `-` ka meaning hai target user ka login-style environment load karna. Isse `HOME`, working directory aur startup configuration target user ke context mein set ho sakte hain.
+
+```bash
+su - root
+whoami     # root
+pwd        # aam taur par /root, system/configuration par depend karta hai
+```
+
+Memory rule:
+
+> **`su user` = user switch with existing environment ka idea**
+> **`su - user` = target user ka login environment load karne ka idea**
+
+Exact behavior shell aur distribution ke configuration par depend kar sakta hai, lekin Day 7 ka conceptual difference yahi hai.
+
+### 7.4 Shell nesting aur `$SHLVL`
+
+Transcript mein nested shell samjhane ke liye shell level check kiya jata hai:
 
 ```bash
 echo $SHLVL
 ```
 
-Shows how deeply nested your shell is. Value `1` = a single shell. Open a shell inside that shell and it becomes `2`.
+Agar ek shell ke andar doosra shell open karte ho, to nesting level badh sakta hai — jaise `1` se `2`. Ye user identity nahi batata; ye shell nesting depth batata hai.
+
+Nested session se bahar aane ke liye:
+
+```bash
+exit
+```
 
 ---
 
-## Part 4 — The `/etc/passwd` file
+## 8. `/etc/passwd` — user record samajhna
 
-Understanding this file is described as **essential** to user management.
+Trainer ke according user management samajhne ke liye `/etc/passwd` ki entry ko samajhna bahut important hai.
 
+```bash
+cat /etc/passwd
 ```
-manish : x : 1102 : 1102 : comment : /home/manish : /bin/bash
-   1     2     3      4        5          6              7
+
+Har line colon `:` se separated fields ka record hoti hai. Conceptual example:
+
+```text
+manish:x:1001:1001:Manish:/home/manish:/bin/bash
 ```
 
-| # | Field | Meaning |
-|---|---|---|
-| 1 | **username** | the account name |
-| 2 | **password** | just `x` today |
-| 3 | **UID** | user ID — unique per user; **root = 0** |
-| 4 | **GID** | primary group ID |
-| 5 | **comment** | descriptive tag (GECOS) |
-| 6 | **home directory** | where the user's home lives |
-| 7 | **shell** | which shell they get on login |
+Is line ke seven fields:
 
-> **Why field 2 is just `x`:** the password hash used to live here, but **for security reasons** it was moved to **`/etc/shadow`**.
+| Field | Meaning |
+|---|---|
+| 1 | Username/account name |
+| 2 | Password field marker, commonly `x` |
+| 3 | UID — User ID |
+| 4 | GID — primary Group ID |
+| 5 | Comment/GECOS field — descriptive information |
+| 6 | User ki home directory |
+| 7 | Login shell |
+
+### 8.1 Password field mein `x` kyu hota hai?
+
+Historically password information `/etc/passwd` mein rakhi ja sakti thi. Security improve karne ke liye password hash ko alag protected file, **`/etc/shadow`**, mein move kiya gaya. Isliye `/etc/passwd` ki second field mein aksar actual hash ke badle `x` marker dikhta hai.
+
+```bash
+ls -l /etc/passwd /etc/shadow
+```
+
+`/etc/shadow` ko casually edit ya expose nahi karna chahiye. Is file mein password hashes aur password-aging information hoti hai.
+
+### 8.2 UID aur GID
+
+- UID user ki numeric identity hai.
+- GID user ke primary group ki numeric identity hai.
+- Root ki UID `0` hoti hai.
+- Normal/system users ke IDs distribution aur configuration ke hisaab se assign hote hain.
+
+Username badal sakta hai, lekin file ownership internally numeric UID se associate hoti hai. Isi wajah se deleted user ke UID reuse hone par orphaned files ka security issue aa sakta hai; is topic ko neeche detail mein dekhenge.
+
+### 8.3 Home directory aur shell
+
+Example mein `/home/manish` batata hai ki user ka home directory path kya hai. Last field `/bin/bash` batata hai ki login par us user ke liye default shell kaunsa hoga.
 
 ---
 
-## Part 5 — Creating users
+## 9. `useradd` se naya user banana
 
-### 5.1 The quick way
+### 9.1 Basic user creation
 
 ```bash
 useradd user1
-tail -2 /etc/passwd     # verify the entry
 ```
 
-Everything unspecified is filled in from system defaults.
-
-### 5.2 The recommended way — specify explicitly
+Isse user record create hota hai aur system defaults ke basis par baaki values choose ki ja sakti hain. Verify karne ke liye trainer last entries dekhne ka method use karte hain:
 
 ```bash
-useradd -d /home/user2 -c "Finance team member" -s /bin/bash user2
+tail -2 /etc/passwd
 ```
 
-| Flag | Sets |
+> `useradd` account record create karta hai; password set karna alag user/password-management task hai. Day 7 ke end mein trainer password management ko next class ke liye defer karte hain.
+
+### 9.2 Important values explicitly specify karna
+
+Trainer advise karte hain ki user create karte waqt sirf username par depend na karo. Home directory, comment, shell aur zarurat ho to UID explicitly define karna clearer hota hai:
+
+```bash
+useradd \
+  -d /home/user2 \
+  -c "Finance team member" \
+  -s /bin/bash \
+  user2
+```
+
+Specific UID ki zarurat ho to:
+
+```bash
+useradd -u 1500 -d /home/user2 -c "Finance team member" -s /bin/bash user2
+```
+
+| Option | Meaning |
 |---|---|
-| `-d` | home **d**irectory |
-| `-c` | **c**omment |
-| `-s` | **s**hell |
-| `-u` | specific **U**ID (otherwise auto-assigned) |
+| `-d` | Home directory set karna |
+| `-c` | Comment/GECOS information set karna |
+| `-s` | Login shell set karna |
+| `-u` | Specific UID assign karna |
 
-> **Why this is best practice:** if something is misconfigured in the defaults directory, the home directory / shell / comment may not get set correctly. Specifying them from the start avoids that and **you get the benefit later**.
+Command options use karne se pehle `useradd --help` ya apne system ka manual check karna useful hai, kyunki defaults distribution ke hisaab se different ho sakte hain.
 
-### 5.3 Where the defaults come from — `/etc/default/useradd`
+### 9.3 Defaults kahan se aate hain?
 
 ```bash
 cat /etc/default/useradd
 ```
 
-| Setting | Meaning |
+Is file mein new users ke defaults mil sakte hain:
+
+| Setting | General role |
 |---|---|
-| **SHELL** | default shell for new users (e.g. `/bin/sh`) |
-| **HOME** | base path for home directories (`/home`) |
-| **GROUP** | default group |
-| **INACTIVE** | days after password expiry before disable — **`-1` means never expire** |
-| **EXPIRE** | default account expiry date — blank means none |
-| **SKEL** | the **skeleton directory** to copy from |
+| `SHELL` | Default login shell |
+| `HOME` | Home directories ka base path, aam taur par `/home` |
+| `GROUP` | Default group-related setting |
+| `INACTIVE` | Password expiry ke baad account disable behavior |
+| `EXPIRE` | Account expiry date ka default |
+| `SKEL` | Skeleton directory ka path |
 
-UIDs below ~100 (or 1000) are **reserved for the system**; normal users start above that.
+Trainer `INACTIVE=-1` ko aise explain karte hain ki password expiry ke baad inactive period ke context mein account disable nahi hoga. Exact password-aging behavior ko real system par `man useradd`, `man shadow` aur `chage` documentation se verify karna chahiye.
 
-> `useradd` is a **binary program** that reads these defaults. If you pass modify options, it applies yours first and takes the remainder from here.
-
----
-
-## Part 6 — `/etc/skel`, the skeleton directory
-
-> **Whenever a new user account is created, the contents of `/etc/skel` are copied automatically into that user's home directory.**
-
-This is how a **framework** is prepared for every new user.
-
-```bash
-ls -a /etc/skel
-# .bash_logout  .bashrc  .profile
-```
-
-Those same three files appear in every new user's home — demonstrated by creating a user and listing their home directory.
-
-**What it is used for in practice:**
-- Default shell configuration and environment variables
-- **Organizational policy messages** — the notice a user sees on login telling them what they may and may not do
-- Any file every user should start with
+UID ranges bhi system policy se related hoti hain. System/service accounts aur normal human users ke liye alag ranges use ki ja sakti hain; exact threshold har distribution par same nahi hota.
 
 ---
 
-## Part 7 — Modifying users: `usermod`
+## 10. User modify karna — `usermod`
+
+Existing user ke attributes change karne ke liye `usermod` use hota hai:
 
 ```bash
-usermod -c "This is my demo" -s /bin/bash user2
+usermod -c "Updated description" -s /bin/bash user2
 ```
 
-Same flags as `useradd`. Verify with `tail /etc/passwd`. Use `usermod --help` for the full option list.
+Home directory, shell, comment, UID aur group membership jaise options ke liye `usermod --help` dekho. Modify karne ke baad record verify karna chahiye:
+
+```bash
+tail /etc/passwd
+id user2
+```
+
+Production system par UID, home directory ya primary group change karne se pehle files, running processes aur ownership impact check karna zaruri hai.
 
 ---
 
-## Part 8 — Deleting users: `userdel`
+## 11. User delete karna — `userdel`
+
+### 11.1 Basic delete aur `-r` ka difference
 
 ```bash
-userdel user1        # deletes the user, LEAVES the home directory
-userdel -r user1     # deletes the user AND the home directory
+userdel user1
 ```
 
-### ⚠ 8.1 The security warning
-
-**Before deleting any user:**
-
-1. **Check their home directory first.** Is there anything important in it?
-2. If yes — **transfer it out**.
-3. If not — delete with `-r`.
-
-### 8.2 Why `userdel` without `-r` is a real vulnerability
-
-This is the most important security content in the session. The chain:
-
-1. You delete a user **without `-r`**. Their **home directory survives**, possibly containing **sensitive information**.
-2. The deleted user's **UID becomes free**.
-3. Later you add a **new user**. The system assigns **the first free UID** — which may be **the deleted user's old UID**.
-4. The orphaned files, still owned by that UID number, are now owned by the **new user**.
-5. **The new user can read the old user's sensitive data.**
-
-> **Outcome: sensitive information leakage.**
-
-### 8.3 The attacker's version
-
-An attacker who has obtained a normal-user shell can hunt for exactly this:
+Basic `userdel` account entry remove kar sakta hai, lekin home directory aur uske andar ka data reh sakta hai.
 
 ```bash
-find / -nouser -o -nogroup      # files with no valid owner
+userdel -r user1
 ```
 
-Orphaned files with no owner reveal a freed UID — a foothold for privilege abuse.
+`-r` user ke saath associated home directory aur mail spool jaise data ko remove karne ki koshish karta hai. Isliye ise bina check kiye run karna destructive ho sakta hai.
 
-### 8.4 The two remediations
+### 11.2 Delete karne se pehle safe workflow
 
-| Option | Action |
-|---|---|
-| **1** | Extract the data you need, then **delete the home directory** |
-| **2** | **Transfer the data** manually and **reassign ownership** to someone else |
+1. User ke processes aur active sessions check karo.
+2. Home directory mein important ya sensitive data hai ya nahi dekho.
+3. Required data ko authorized owner/location par transfer karo.
+4. Backup ya approval confirm karo.
+5. Tabhi `userdel` ya `userdel -r` choose karo.
+
+> Kisi real server par blindly `userdel -r` run mat karo. Ye demonstration command hai; pehle target user aur data verify karo.
+
+### 11.3 UID reuse se sensitive data leakage ka risk
+
+Transcript ka important security scenario ye hai:
+
+1. User delete kiya gaya, lekin home directory delete nahi hui.
+2. Purane user ki files disk par reh gayi.
+3. Purane user ka UID free ho gaya.
+4. Baad mein naya user create hua aur system ne wahi available UID assign kar di.
+5. Files ownership numeric UID par based hone ke karan purane user ki files naye user ko owned dikh sakti hain.
+6. Naya user sensitive information read kar sakta hai.
+
+Yahan problem sirf username ki nahi hai. Linux file ownership ko UID number se resolve karta hai. Isliye stale home directories aur UID reuse ko carefully handle karna chahiye.
+
+### 11.4 Orphaned files dhoondhna
+
+Aise files jinka owner/group system mein resolve nahi ho raha ho, unhe locate karne ke liye `find` ka use kiya ja sakta hai:
+
+```bash
+find / -nouser -o -nogroup 2>/dev/null
+```
+
+- `-nouser` — jis numeric UID ka matching username nahi mil raha.
+- `-nogroup` — jis numeric GID ka matching group nahi mil raha.
+- `2>/dev/null` — inaccessible directories ke errors ko display se hata sakta hai.
+
+Root filesystem par ye command expensive ho sakti hai. Authorized lab ya maintenance window mein, aur zarurat ho to specific path se, run karna better hai.
+
+### 11.5 Remediation ke do broad options
+
+Situation ke hisaab se:
+
+1. Required data ko authorized location par copy/transfer karke orphaned home directory remove karo.
+2. Data retain karna ho to ownership manually kisi valid user/group ko assign karo, permissions review karo, aur old account ki files ko document karo.
+
+Example ownership review ke liye:
+
+```bash
+ls -lan /home/old-user
+```
+
+`-n` numeric UID/GID dikhata hai, jisse unresolved ownership identify karna easy hota hai.
 
 ---
 
-## Part 9 — Group Management
+## 12. `/etc/skel` — naye user ka basic framework
 
-### 9.1 Why groups exist — the scale argument
+Jab naya user account create hota hai, to user ke home environment ke liye ek starting template use kiya ja sakta hai. Is template directory ko **skeleton directory** kaha jata hai:
 
-The scenario given:
+```bash
+ls -la /etc/skel
+```
 
-- An organization of **1000 people**
-- **50 of them** work on one project
-- That project needs access to **30–40 files**
+Aam taur par yahan ye files mil sakti hain:
 
-**Could you assign permissions individually?** 50 users × 35 files = 1,750 permission assignments — and the same again to revoke them.
+```text
+.bash_logout
+.bashrc
+.profile
+```
 
-> **Is it possible in a real scenario? Not possible.**
->
-> 1. You could **never monitor** who is doing what.
-> 2. It is hopelessly **time consuming** — nobody has that much time.
+### 12.1 Iska purpose
 
-**The solution:**
+`/etc/skel` ke contents se har naye user ko common starting configuration mil sakti hai:
 
-1. Create **one group** of the 50 people.
-2. Change the **group ownership of the 35 files** to that group.
-3. Set the permissions **once**, on the group.
+- Shell startup configuration
+- Default environment behavior
+- Organization ke login instructions ya notice
+- Har user ke home mein required common files
 
-**The payoff:**
+Lecture mein trainer naya user create karke uske home directory mein template files dikhate hain. Exact files distribution, package aur administrator customization par depend kar sakti hain.
 
-| Task | Without groups | With groups |
+### 12.2 Important caution
+
+`/etc/skel` mein secret keys, passwords ya private data nahi rakhna chahiye, kyunki iska content multiple new accounts ke home directories mein copy ho sakta hai. Sirf safe, common configuration rakho.
+
+---
+
+## 13. Group management ki zarurat
+
+### 13.1 Individual permissions scale nahi hoti
+
+Trainer ek organization ka example dete hain:
+
+- Company mein bahut saare employees hain.
+- Ek project par 50 log kaam karte hain.
+- Project ki 30–40 files par in sabko similar access chahiye.
+
+Agar har user ko har file par individually permission doge, to:
+
+- Configuration bahut time-consuming hogi.
+- Monitor karna mushkil hoga ki kaun kis file ko access kar raha hai.
+- Employee add/remove hone par dozens of permissions manually update karni padengi.
+
+### 13.2 Group-based solution
+
+Better design:
+
+1. Project members ka ek group banao.
+2. Required files/directories ka group ownership us project group ko do.
+3. Group permissions ek baar configure karo.
+4. New employee ko group mein add karo.
+5. Employee leave kare to group se remove karo.
+
+Is approach mein file-by-file individual permission edits ki zarurat kam ho jati hai. Group membership hi access management ka central point ban jati hai.
+
+> Groups ka purpose permissions ko centrally manage karna hai — ye monitoring, review aur access revocation ko simpler banata hai.
+
+---
+
+## 14. Primary group aur secondary group
+
+Linux user ke context mein do important group types samjho:
+
+### 14.1 Primary group
+
+- User ka ek primary group hota hai.
+- New user create karte waqt distribution/configuration ke hisaab se user ke naam ka group create ho sakta hai.
+- `/etc/passwd` ke GID field mein primary group ka numeric ID stored hota hai.
+- User ke create kiye files par default group ownership primary group se related ho sakti hai.
+
+### 14.2 Secondary groups
+
+- User ko additional groups mein member banaya ja sakta hai.
+- Ek user multiple secondary groups ka member ho sakta hai.
+- Project, device, administration ya service access ke liye secondary groups use kiye ja sakte hain.
+- Membership details `/etc/group` mein dikh sakti hain.
+
+Simple comparison:
+
+| | Primary group | Secondary group |
 |---|---|---|
-| Add person #51 | 35 permission changes | **Add to group** |
-| Remove someone | 35 permission changes | **Remove from group** |
-| Monitoring | 50 individuals | One group |
+| Count | Usually ek | Multiple ho sakte hain |
+| Main record | `/etc/passwd` ka GID field | `/etc/group` membership list |
+| Use | Default group context | Additional project/access membership |
 
-> The whole point: **you don't limit each individual's access on each file.**
-
-### 9.2 Primary vs secondary groups
-
-| | **Primary group** | **Secondary group** |
-|---|---|---|
-| Created | Automatically, **named after the user** | Manually, by you |
-| Purpose | The user's own default group | Project/team collaboration |
-| How many | Exactly one | **As many as you like** |
-| Stored in | GID field of `/etc/passwd` | `/etc/group` member list |
-
-### 9.3 The `/etc/group` file
+### 14.3 Group files dekhna
 
 ```bash
-tail -5 /etc/group
-cat /etc/group | grep kali
+cat /etc/group
+grep '^kali:' /etc/group
+groups
+groups kali
 ```
 
-Secondary group memberships appear here as a member list; the primary group is the GID in `/etc/passwd`.
+- `groups` current user ki group membership dikhata hai.
+- `groups kali` specific user ki groups dikhata hai.
+- `/etc/group` mein group name, numeric GID aur member list ka format hota hai.
 
-### 9.4 Group commands
+---
 
-| Command | Purpose |
-|---|---|
-| `groups` | Which groups **am I** in |
-| `groups <user>` | Which groups **that user** is in |
-| `groupadd <name>` | **Create** a group |
-| `groupmod -n <new> <old>` | **Rename** a group |
-| `groupdel <name>` | **Delete** a group |
+## 15. Group commands
+
+### 15.1 Group create karna — `groupadd`
 
 ```bash
 groupadd UNIX
-tail -2 /etc/group           # verify — group exists but has no members yet
-groups kali                  # kali adm dialout cdrom sudo ...
-groupmod -n unix UNIX        # rename UNIX -> unix
-groupdel unix
 ```
 
-### 9.5 ⚠ The `-a` flag is mandatory
+Verify karne ke liye:
 
 ```bash
-usermod -aG UNIX sachin2     # ADD to a secondary group, keeping existing ones
-usermod -G  UNIX sachin2     # REPLACE all secondary groups with just this one
+tail -2 /etc/group
 ```
 
-> **Forgetting `-a` removes the user from every other secondary group.** The new group **overrides** them all. This is one of the classic destructive Linux admin mistakes.
+Naya group create ho sakta hai, lekin usmein members automatically nahi honge. User ko separately add karna padta hai.
 
-### 9.6 Changing the primary group — lowercase `g`
+### 15.2 User ko secondary group mein add karna — `usermod -aG`
 
 ```bash
-usermod -g UNIX sachin2      # change PRIMARY group
+usermod -aG UNIX sachin2
 ```
 
-| Flag | Effect |
+Yahan:
+
+- `-a` ka matlab existing supplementary groups ko preserve karke append karna.
+- `-G` supplementary/secondary groups specify karta hai.
+- `UNIX` target group hai.
+- `sachin2` target user hai.
+
+Verify:
+
+```bash
+groups sachin2
+id sachin2
+```
+
+### 15.3 `-a` bhoolne ka risk
+
+```bash
+usermod -G UNIX sachin2
+```
+
+Is form mein `-a` nahi hai. Common Linux behavior mein `-G` existing supplementary group list ko replace kar sakta hai. Matlab user ko `UNIX` group mil jayega, lekin uski purani secondary memberships remove ho sakti hain.
+
+Isliye user ko existing groups ke saath nayi secondary group membership deni ho to normal safe pattern hai:
+
+```bash
+usermod -aG newgroup username
+```
+
+> Capital `G` aur lowercase `g` ko confuse mat karo; `-a` miss karna destructive access change ban sakta hai.
+
+### 15.4 Primary group change karna — lowercase `-g`
+
+```bash
+usermod -g UNIX sachin2
+```
+
+Yahan lowercase `-g` user ka **primary group** change karta hai.
+
+| Option | Meaning |
 |---|---|
-| `-aG` (capital G, with `a`) | **add** secondary group |
-| `-G` (capital G, no `a`) | **replace** all secondary groups ⚠ |
-| `-g` (lowercase g) | change **primary** group |
+| `-aG group user` | Existing memberships preserve karke secondary group add |
+| `-G group user` | Supplementary groups ki list replace kar sakta hai |
+| `-g group user` | Primary group change |
 
-### 9.7 ⚠ You cannot delete a group that is someone's primary group
+Primary group change karne se pehle existing files, default group behavior aur application impact check karo.
+
+### 15.5 Group rename karna — `groupmod -n`
+
+```bash
+groupmod -n unix UNIX
+```
+
+Isse old group name `UNIX` ko new name `unix` diya ja sakta hai. Verify:
+
+```bash
+grep -E '^(UNIX|unix):' /etc/group
+```
+
+Command syntax system ke manual se verify karo; case-sensitive names ko exact type karna zaruri hai.
+
+### 15.6 Group delete karna — `groupdel`
 
 ```bash
 groupdel unix
-# cannot remove the group ...
 ```
 
-> **A group must not be the primary group of any user before you can delete it.** Change that user's primary group first, then delete.
+Agar group kisi user ka **primary group** hai, to system group delete karne se refuse kar sakta hai. Pehle affected user ka primary group kisi valid group par change karo:
+
+```bash
+usermod -g anothergroup username
+groupdel unix
+```
+
+Delete karne se pehle ye check karo ki group ka use files, services, scripts ya applications mein to nahi ho raha. Group delete karna sirf command-success ka matter nahi; ownership aur access impact bhi review karna chahiye.
 
 ---
 
-## Part 10 — Complete cheat sheet
+## 16. Day 7 command summary
 
 ```bash
-# Identity
-whoami                  # current user
-who                     # who is logged in
-w                       # who is logged in and doing what
-id / id <user>          # UID, GID, group memberships
+# Current identity and sessions
+whoami
+who
+w
+id
+id <user>
 
-# Switching
-su                      # act as root, KEEP your environment
-su <user>               # act as user, keep your environment
-su - <user>             # FULL login as user, their environment
-echo $SHLVL             # shell nesting level
+# Switch user
+su <user>             # target identity, existing environment ka concept
+su - <user>           # target user ka login environment
+su                    # commonly root target
+su -                  # root login-style shell
+echo $SHLVL
+exit
 
-# Users
+# User records
+cat /etc/passwd
+cat /etc/shadow
+cat /etc/default/useradd
+ls -la /etc/skel
+
+# Create and verify user
 useradd user1
-useradd -d /home/u2 -c "comment" -s /bin/bash -u 1500 u2
-usermod -c "new comment" -s /bin/bash user2
-userdel user1           # leaves home directory  ⚠
-userdel -r user1        # removes home directory too
-tail -2 /etc/passwd     # verify
+tail -2 /etc/passwd
+useradd -u 1500 -d /home/user2 -c "Comment" -s /bin/bash user2
 
-# Reference files
-/etc/passwd             # user records (7 fields)
-/etc/shadow             # password hashes
-/etc/group              # group records
-/etc/default/useradd    # defaults for new users
-/etc/skel               # template copied into each new home
+# Modify and inspect user
+usermod -c "New comment" -s /bin/bash user2
+id user2
+
+# Delete user — first inspect/transfer data
+userdel user1
+userdel -r user1
+
+# Orphaned ownership search
+find / -nouser -o -nogroup 2>/dev/null
 
 # Groups
-groups / groups <user>
+groups
+groups <user>
+cat /etc/group
 groupadd UNIX
-usermod -aG UNIX user   # ADD secondary group (keep existing) ✔
-usermod -G  UNIX user   # REPLACE all secondary groups       ⚠
-usermod -g  UNIX user   # change PRIMARY group
-groupmod -n newname oldname
-groupdel UNIX           # fails if it is anyone's primary group
+usermod -aG UNIX <user>     # add secondary group, preserve existing
+usermod -G UNIX <user>      # may replace secondary group list
+usermod -g UNIX <user>      # change primary group
+groupmod -n unix UNIX
+groupdel unix
 ```
 
----
-
-## Part 11 — Self-check questions
-
-1. Why shouldn't a developer have access to the whole server?
-2. Why do admins log in as a normal user and elevate temporarily?
-3. What is root's UID, and why that number?
-4. What happens to blast radius if a vulnerability is exploited while logged in as root vs as a normal user?
-5. Difference between `whoami`, `who`, `w` and `id`.
-6. What is SELinux, and why does industry prefer Red Hat?
-7. Define login shell vs non-login shell.
-8. After `su`, why did the prompt show `/home/kali` instead of `/root`?
-9. What does the `-` in `su -` actually do?
-10. Name all seven fields of `/etc/passwd`. Why is field 2 just `x`?
-11. Which three `useradd` flags should you specify explicitly, and why?
-12. What lives in `/etc/default/useradd`? What does `INACTIVE=-1` mean?
-13. What is `/etc/skel` and when does it take effect? Name three files it typically holds.
-14. Trace the full security chain from `userdel` without `-r` to sensitive information leakage.
-15. What command would an attacker use to find orphaned files?
-16. Compute the permission assignments needed for 50 users × 35 files without groups. Why is it unworkable?
-17. Difference between a primary and a secondary group. How many of each can a user have?
-18. What is the difference between `-aG`, `-G` and `-g` in `usermod`? Which one is destructive?
-19. Why does `groupdel` refuse to delete a group, and how do you fix it?
+Commands ko production machine par copy-paste karne se pehle `man` page, target username, backup aur expected effect verify karo. `userdel -r`, `usermod -G`, primary-group changes aur `groupdel` especially carefully handle karne chahiye.
 
 ---
 
-## Part 12 — Coming up next
+## 17. Common mistakes aur revision points
 
-**Password management and privileges:** how to manage passwords, the system files involved, and a deeper look at user privileges.
+1. Har task ke liye root account use karna.
+2. `whoami`, `who`, `w` aur `id` ke roles ko mix karna.
+3. `su user` aur `su - user` ko same samajhna.
+4. `/etc/passwd` ke UID/GID/home/shell fields ka order bhoolna.
+5. Ye assume karna ki `useradd` automatically password set kar deta hai.
+6. User delete karte waqt home directory aur sensitive data verify na karna.
+7. `userdel -r` ko bina backup/approval run karna.
+8. Deleted UID reuse aur stale files se hone wale ownership issue ko ignore karna.
+9. New account ke default source `/etc/default/useradd` ko check na karna.
+10. `/etc/skel` mein secret information rakh dena.
+11. `usermod -aG` mein `-a` omit karke existing secondary groups replace kar dena.
+12. `-g` aur `-G` ka difference bhoolna.
+13. Kisi user ka primary group bane hue group ko `groupdel` se delete karne ki koshish karna.
+14. Group/file ownership change karne ke baad existing applications aur files ka impact verify na karna.
+
+---
+
+## 18. Self-check questions
+
+1. User management aur least privilege ki zarurat kyu hoti hai?
+2. Normal user ke roop mein kaam karna root ke roop mein kaam karne se safer kyu hai?
+3. Root ki UID kya hoti hai?
+4. `whoami`, `who`, `w` aur `id` mein practical difference kya hai?
+5. `su user` aur `su - user` ke environment behavior mein kya difference hai?
+6. `$SHLVL` kya batata hai?
+7. `/etc/passwd` ke seven fields ka order likho.
+8. `/etc/passwd` mein password field mein `x` kyu dikh sakta hai?
+9. `/etc/default/useradd` aur `/etc/skel` ka role kya hai?
+10. `useradd` aur `usermod` mein difference kya hai?
+11. `userdel user1` aur `userdel -r user1` mein kya difference hai?
+12. Deleted UID reuse se sensitive data leak kaise ho sakta hai?
+13. `-nouser` aur `-nogroup` ka use kis tarah ke orphaned files dhoondhne mein hota hai?
+14. Groups individual file permissions ko scalable kaise banate hain?
+15. Primary aur secondary group mein kya difference hai?
+16. `usermod -aG`, `usermod -G` aur `usermod -g` ka effect compare karo.
+17. Kisi user ka primary group bane group ko directly delete kyu nahi kiya ja sakta?
+18. Group membership ya user deletion change karne se pehle kaunse safety checks karne chahiye?
+
+---
+
+## 19. Final takeaway
+
+Day 7 ka core message hai:
+
+- User ko sirf required access do; unnecessary root privilege risk badhata hai.
+- UID/GID ko samjhe bina Linux ownership aur permissions properly understand nahi hoti.
+- `su -` target user ka login environment load karne ke liye use hota hai; normal `su` mein existing environment carry ho sakta hai.
+- `/etc/passwd`, `/etc/shadow`, `/etc/default/useradd` aur `/etc/skel` user lifecycle ke important parts hain.
+- User delete karte waqt home data, UID reuse aur orphaned files ka risk check karo.
+- Groups ke through project access ko centrally manage karna individual permissions se practical hai.
+- `-aG`, `-G` aur `-g` ka difference yaad rakhna zaruri hai.
+
+Trainer Day 7 ke end mein **password management aur privileges** ko next class ka topic batate hain. Isliye abhi user/group lifecycle ka base clear hona chahiye; password-aging, password files aur privilege configuration ko agle session mein continue kiya jayega.

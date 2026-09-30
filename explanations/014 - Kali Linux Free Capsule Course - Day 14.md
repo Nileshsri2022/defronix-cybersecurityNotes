@@ -1,334 +1,653 @@
-# Explanation — Day 14: `history`, Root Password Recovery, `sort` & `uniq`
+# Day 14 — Kali Linux Capsule Course: `history`, Root Password Recovery, `sort` aur `uniq` (Hinglish Explanation)
 
-**Lecture:** 014 — Kali Linux Free Capsule Course, Day 14
-**Translation:** [`english/014 - Kali Linux Free Capsule Course - Day 14.md`](../english/014%20-%20Kali%20Linux%20Free%20Capsule%20Course%20-%20Day%2014.md)
-**Note:** Final content session of the Kali Linux capsule course. The **OSINT course** begins next.
-
----
-
-## Part 1 — The `history` command
-
-> Every command you run is saved. In the background there is a **history file** (`~/.bash_history`) where all of them are stored.
-
-### 1.1 Recalling commands
-
-| Method | Action |
-|---|---|
-| **↑ / ↓ arrows** | step back and forward through previous commands |
-| **`!!`** | re-run the **immediately previous** command |
-| **`!string`** | re-run the most recent command **starting with** that string |
-| **`!number`** | re-run history entry **by its number** |
-| **`Ctrl+R`** | **reverse interactive search** through history |
-
-```bash
-!!              # repeat the last command
-!to             # repeat the last command starting with "to" (e.g. touch file77)
-!1634           # run history entry number 1634
-```
-
-**`Ctrl+R`** opens `(reverse-i-search)`. Type any fragment and it finds the matching command; press Enter to run it.
-
-> **`!string` searches your history file.** If you have never run a command starting with that string, nothing is found.
-
-### 1.2 Viewing history
-
-```bash
-history          # everything
-history 10       # last 10 entries
-history 50       # last 50 entries
-```
+**Source transcript:** `transcripts/014 - Kali Linux Free Capsule Course - Day 14 [ Hindi ].hi-orig.srt`
+**Trainer in transcript:** Nitesh Singh (Defronix)
+**Builds on:** Days 1–13 — Linux fundamentals, permissions, shell commands, packages aur variables
+**Note:** Ye explanation Hindi original transcript ko samajh kar likhi gayi hai; ye line-by-line literal translation nahi hai. Auto-captions mein `history`, `HISTFILE`, `HISTSIZE`, GRUB, root-password recovery, `sort`, `uniq` aur pipe concepts kai jagah garbled mile. Context ke basis par intended commands aur safety notes restore karke simple Hinglish mein explain kiya gaya hai.
 
 ---
 
-## Part 2 — The three history environment variables
+## 1. Day 14 ka focus
 
-| Variable | Controls | Default |
+Day 14 Kali/Linux capsule course ke final content sessions mein se ek hai. Aaj ke main topics:
+
+1. **`history` command** — previous shell commands dekhna aur repeat karna.
+2. History variables, storage aur security implications.
+3. Forgotten root password recovery ka authorized lab overview.
+4. `sort` se lines/columns order karna.
+5. `uniq` se adjacent duplicate lines remove karna.
+6. Pipes se commands ko combine karna.
+
+Trainer session ke end mein agle live course ke roop mein OSINT announce karte hain. Kali capsule course ka purpose beginner ke Linux fundamentals ko strong banana hai, na ki har advanced administration topic complete karna.
+
+---
+
+## 2. `history` command
+
+Bash shell commands ko history list mein maintain kar sakti hai. Current shell history dekhne ke liye:
+
+```bash
+history
+```
+
+Output mein number aur command dikh sakti hai:
+
+```text
+  101  pwd
+  102  ls -la
+  103  cd /tmp
+```
+
+History se:
+
+- previous command recall,
+- repetitive typing reduce,
+- troubleshooting steps review,
+- shell session ka working context samajhna
+possible hota hai.
+
+### 2.1 Last N entries
+
+```bash
+history 10
+```
+
+Last 10 history entries show karne ka common pattern hai.
+
+### 2.2 Arrow keys
+
+Interactive terminal mein:
+
+- Up arrow — previous command
+- Down arrow — newer command
+
+Ye `history` command run kiye bina quick recall ka easiest method hai.
+
+### 2.3 Previous command repeat — `!!`
+
+```bash
+!!
+```
+
+Previous command ko repeat karta hai.
+
+Example:
+
+```bash
+apt update
+sudo !!
+```
+
+Agar pehle command permission denied hui, to `sudo !!` previous command ko `sudo` ke saath repeat karne ka common shortcut hai. Repeat karne se pehle command review karo, especially destructive commands ke liye.
+
+### 2.4 Prefix se repeat — `!string`
+
+```bash
+!apt
+```
+
+History mein `apt` se start hone wali latest command repeat kar sakta hai. Agar matching command nahi hai, shell error de sakti hai.
+
+### 2.5 Number se repeat — `!N`
+
+```bash
+!1634
+```
+
+History number `1634` wali command execute kar sakta hai. Number run karne se pehle displayed history line check karo; old command ka effect current directory/state mein different ho sakta hai.
+
+### 2.6 Reverse interactive search — `Ctrl+R`
+
+```text
+Ctrl+R
+```
+
+Prompt par previous commands ke text se reverse search start hota hai. Search phrase type karo; matching command mil sakti hai. Again `Ctrl+R` se older matches cycle ho sakte hain, Enter se selected command run aur arrow key se edit karke run kar sakte ho.
+
+---
+
+## 3. History environment variables
+
+Bash history ke behavior ko environment/shell variables control karte hain:
+
+| Variable | Role | Common default/example |
 |---|---|---|
-| **`HISTFILE`** | **name and location** of the history file | `~/.bash_history` |
-| **`HISTSIZE`** | how many commands held **in memory** | **1000** |
-| **`HISTFILESIZE`** | how many commands kept **in the file** | 1000 |
+| `HISTFILE` | History file ka name/path | `~/.bash_history` |
+| `HISTSIZE` | Current shell memory mein kitni entries | `1000` common |
+| `HISTFILESIZE` | Disk history file mein kitni entries retain | `1000` common |
+| `HISTCONTROL` | Certain commands ko history mein save karne ka behavior | `ignorespace`/`ignoredups` possible |
+
+Inspect:
 
 ```bash
-echo $HISTSIZE          # 1000
-HISTSIZE=5000           # temporary
+echo "$HISTFILE"
+echo "$HISTSIZE"
+echo "$HISTFILESIZE"
+echo "$HISTCONTROL"
 ```
 
-> **After the limit is reached it starts to overwrite** the oldest entries.
+Values distribution, shell configuration aur user profile par depend karte hain.
 
-**To make it permanent**, edit `~/.bashrc` and raise `HISTSIZE` there — the same three-level persistence model from Day 13.
-
----
-
-## Part 3 — ⚠ When history is actually written
-
-> **Today's history is only saved into the history file when you LOG OUT.**
->
-> What the `history` command shows you is the **in-memory** history.
-
-**Why this matters:** the file on disk lags behind the live session. Two consequences worth knowing:
-
-- Kill a terminal abruptly and that session's history may never be written.
-- In forensics, `~/.bash_history` shows **completed sessions**, not what is happening right now.
-
----
-
-## Part 4 — Keeping a command out of history
+### 3.1 `HISTSIZE`
 
 ```bash
- date         # note the LEADING SPACE — not recorded
-history       # "date" does not appear
+HISTSIZE=5000
 ```
 
-> **Put a space before a command and it will not go into your history file.**
-
-This works when `HISTCONTROL` includes `ignorespace` (common default). The trainer is honest that it isn't universal: *"there's no guarantee that it will work"* on every system.
-
-**Security relevance:** this is also how someone hides activity — worth knowing from both sides.
-
----
-
-## Part 5 — Clearing history
+Current shell ke in-memory history limit ko temporarily change kar sakta hai. Permanent setting ke liye user shell configuration, jaise `~/.bashrc`, mein export/assignment configure kar sakte ho:
 
 ```bash
-history -c        # clear the entire history
-history -d 17     # delete entry number 17
+export HISTSIZE=5000
+export HISTFILESIZE=10000
 ```
 
-> ⚠ **On the trainer's Kali machine `-c` did not work.** His explanation: *"on the latest Kali machines it's possible the `-c` option has been removed… it's possible this has been modified due to security reasons."*
->
-> These options **do work on other UNIX systems** — Fedora, Red Hat, CentOS.
+Old entries limit cross hone par drop/overwrite ho sakti hain. History ko forensic-proof log samajhna galat hai.
+
+### 3.2 `HISTFILE`
+
+```bash
+echo "$HISTFILE"
+```
+
+Aam Bash setup mein ye `~/.bash_history` ho sakta hai. Path change kiya ja sakta hai, lekin permissions aur privacy implications samjho.
 
 ---
 
-## Part 6 — ⭐ Resetting a forgotten root password
+## 4. History disk par kab likhi jati hai?
 
-The promised demonstration, outstanding since Day 8.
+Trainer basic behavior explain karte hain ki current session ki history memory mein hoti hai aur logout/exit ke aas-paas history file mein write ho sakti hai.
 
-### 6.1 The scenario
+Important nuance:
 
-You power on the machine, reach the login screen, and **you do not know the root password.** The `passwd` command is useless — it requires you to be logged in already.
+- Bash configuration `history -a`, `history -w`, `histappend` jaise options se write timing change kar sakti hai.
+- Abrupt terminal kill ya crash se current session ki entries file mein save na ho sakti hain.
+- Multiple terminals same history file ke saath work kar sakte hain.
+- `~/.bash_history` complete real-time record guaranteed nahi hai.
 
-### 6.2 ⚠ Distribution warning — read first
+Useful commands:
 
-> **This procedure is for Debian-based systems only — Kali, Debian, Ubuntu.**
->
-> **Do NOT try it on Fedora / Red Hat / CentOS.** Those require additional steps because **the security policy works differently**. Without them you get an error and **your machine may not boot at all.**
-
-### 6.3 The procedure
-
-| Step | Action |
-|---|---|
-| **1** | Power on the machine |
-| **2** | At the **GRUB menu**, press **`e`** to edit |
-| **3** | Find the line beginning with **`linux`** |
-| **4** | Move to the **very end** of that line |
-| **5** | **Delete** `ro`, `quiet` and `splash`; replace with **`rw init=/bin/bash`** |
-| **6** | Press **`Ctrl+X`** to boot |
-
+```bash
+history -a   # current session ki new lines append karne ki koshish
+history -w   # current history ko history file mein write
 ```
-# before:
+
+Forensics mein shell history useful lead hai, lekin sole source of truth nahi. Process accounting, audit logs, terminal logs, filesystem timestamps aur other telemetry bhi review karni pad sakti hai.
+
+---
+
+## 5. Ek command ko history se hide karna
+
+Kuch Bash configurations mein leading space wali command history mein save nahi hoti:
+
+```bash
+ date
+```
+
+Yahan `date` se pehle ek space hai. Ye behavior tab work karta hai jab `HISTCONTROL` mein `ignorespace`/related option enabled ho:
+
+```bash
+echo "$HISTCONTROL"
+```
+
+### 5.1 Security implication
+
+Ye convenience/privacy feature hai, security guarantee nahi. Agar koi user sensitive command ko leading space se hide karta hai, to:
+
+- history file mein line absent ho sakti hai,
+- lekin process/audit logs, shell telemetry, terminal recording ya system logs mein evidence ho sakta hai,
+- command result/filesystem changes separately visible ho sakte hain.
+
+Defensive side par `HISTCONTROL` ko audit strategy ka replacement mat samjho.
+
+### 5.2 Duplicate commands
+
+`HISTCONTROL=ignoredups` ya `ignoreboth` repeated commands ko suppress kar sakta hai. Exact behavior shell settings par depend karega.
+
+---
+
+## 6. History clear/delete karna
+
+Current shell history clear karne ka Bash command:
+
+```bash
+history -c
+```
+
+Specific entry delete karna:
+
+```bash
+history -d 17
+```
+
+File se old history remove karni ho to shell behavior/version ke hisaab se:
+
+```bash
+history -c
+history -w
+```
+
+> Ye commands current shell/history file behavior par depend karte hain. History clear karna activity ko system-wide erase nahi karta; audit logs, backups aur other evidence separately exist kar sakte hain.
+
+Production incident mein history delete karne ke bajay evidence-preservation/IR policy follow karo. Apni disposable lab mein hi history options test karo.
+
+---
+
+## 7. Forgotten root password recovery — important scope warning
+
+Trainer promised root-password recovery demonstration continue karte hain. Ye section sirf:
+
+- apni owned machine,
+- authorized lab VM,
+- documented recovery process
+
+ke liye hai.
+
+Kisi aur computer par physical access se password reset karna unauthorized access ho sakta hai.
+
+### 7.1 Distribution difference
+
+Transcript Debian-based systems — Kali, Debian, Ubuntu — ke GRUB-style recovery flow ke context mein hai. Fedora/Red Hat/CentOS systems mein boot process, SELinux labels, initramfs aur recovery steps different ho sakte hain.
+
+> Kali/Debian procedure ko Fedora/Red Hat par blindly apply mat karo. Wrong boot parameter se system boot issue ya data risk ho sakta hai.
+
+### 7.2 High-level recovery flow
+
+Legacy/GRUB lab setup mein broad flow:
+
+1. Machine power on karo.
+2. GRUB menu display hone par entry select karo.
+3. Edit mode ke liye `e` press karo.
+4. `linux`/`linuxefi` se start hone wali kernel line identify karo.
+5. Existing read-only/quiet boot arguments ko carefully review karo.
+6. Authorized recovery environment ke liye writable root shell parameter add/adjust karo.
+7. Boot karo.
+8. Root filesystem writable hai ya nahi verify karo.
+9. `passwd` se authorized password reset karo.
+10. Normal init/reboot ke through system ko safely restart karo.
+
+Transcript ka example Debian/Kali-style line ko conceptual form mein dikhata hai:
+
+```text
+# before (example only)
 linux /boot/vmlinuz-... root=UUID=... ro quiet splash
 
-# after:
+# recovery example discussed in class
 linux /boot/vmlinuz-... root=UUID=... rw init=/bin/bash
 ```
 
-**What this does:** `init=/bin/bash` tells the kernel to launch a **bash shell as PID 1** instead of the normal init system — so you land in a root shell with no login prompt. `rw` mounts the filesystem writable so changes can be saved.
+Exact kernel line, bootloader version aur encrypted-disk setup ke hisaab se details change ho sakti hain. Live recovery se pehle backup/console access confirm karo.
 
-### 6.4 After booting
+### 7.3 `init=/bin/bash` ka meaning
 
-You land at a prompt showing **`/`** — you are in the **root partition**, not root's home directory.
+`init=/bin/bash` kernel ko normal init/system manager ke badle Bash ko initial process/PID 1 start karne ko bolta hai. Isse login screen ke bina root-level maintenance shell mil sakti hai.
 
-**Step 7 — Verify the filesystem is writable:**
+`rw` ka intent root filesystem ko writable mount karna hai, taaki password database update save ho sake.
+
+### 7.4 Root filesystem verify karna
+
+Recovery shell mein:
 
 ```bash
 mount
 ```
 
-Check the entry for `/`. It must **not** say `ro`.
-
-> **It should not be READ ONLY.** If you find `ro` there, fix it:
+Root `/` mount entry par `ro` (read-only) hai ya `rw` (read-write), check karo. Agar authorized recovery environment mein root read-only hai:
 
 ```bash
 mount -o remount,rw /
 ```
 
-**Step 8 — Change the password:**
+Mount output aur filesystem state verify kiye bina password command ko success samajhna unsafe hai.
+
+### 7.5 Password reset aur restart
 
 ```bash
 passwd
-# password updated successfully
 ```
 
-**Step 9 — Reboot:**
+New password set karne ke baad normal init/reboot process use karo. Transcript example:
 
 ```bash
 exec /sbin/init
 ```
 
-> *"The binary file for rebooting the machine — I am getting that executed."*
+Kuch environments mein `reboot -f`, `systemctl reboot` ya VM power-cycle different result de sakte hain. PID 1 recovery shell ko abruptly kill karne ke bajay documented procedure follow karo.
 
-The machine reboots normally and you log in with the new password.
+### 7.6 Physical security lesson
 
-### 6.5 ⚠ The security lesson
+Agar attacker ko physical access mil jaye aur boot parameters edit kar sake, to login password alone machine ko protect nahi karta.
 
-This procedure requires only **physical access to the machine**. It takes about two minutes and needs no prior credentials.
+Controls:
 
-**This is exactly why Day 8 covered boot-time protections:**
+- GRUB/bootloader password
+- BIOS/UEFI administrator password
+- External-media boot restriction
+- Full-disk encryption
+- Secure physical server room/device access
+- Recovery console access control
 
-| Defence | Prevents |
+| Defence | Kis bypass ko reduce karta hai |
 |---|---|
-| **GRUB password** | editing the boot parameters at step 2 |
-| **BIOS/UEFI password** | changing boot order to bypass GRUB |
-| **Full disk encryption** | reading the filesystem at all |
-| **Physical security** | reaching the machine in the first place |
+| GRUB password | Kernel boot parameter edit |
+| BIOS/UEFI password | Boot order/firmware change |
+| Full-disk encryption | Offline filesystem read/write |
+| Physical access control | Machine tak direct access |
 
-> Without these, **anyone with physical access owns the machine.** Knowing the attack is what justifies the defence.
+> Full-disk encryption ke bina live ISO se offline file access possible ho sakta hai. Recovery process ko secure karna system security ka part hai.
 
 ---
 
-## Part 7 — `sort`
+## 8. `sort` command
+
+`sort` text lines ko order mein arrange karta hai:
 
 ```bash
-sort filename.txt           # alphabetical sort
-sort -k1 filename.txt       # sort by column 1
-sort -k2 filename.txt       # sort by column 2
+sort filename.txt
 ```
 
-| Flag | Effect |
-|---|---|
-| (none) | sort alphabetically |
-| `-k1`, `-k2` | sort by a specific **column** |
-| `-r` | reverse |
-| `-n` | numeric sort |
-| `-u` | sort and remove duplicates in one step |
+Default sort lexical/alphabetical behavior use karta hai. Original file usually in-place change nahi hoti; output screen par aata hai. Save karna ho to redirect:
+
+```bash
+sort filename.txt > sorted.txt
+```
+
+### 8.1 Column/key sorting
+
+```bash
+sort -k1 filename.txt
+sort -k2 filename.txt
+```
+
+`-k` sort key/field position specify karta hai. Whitespace-separated data mein column numbering context ke hisaab se samjho.
+
+### 8.2 Reverse
+
+```bash
+sort -r filename.txt
+```
+
+Descending/reverse order.
+
+### 8.3 Numeric sort
+
+```bash
+sort -n numbers.txt
+```
+
+String/lexical order aur numeric order alag hote hain:
+
+```text
+1
+10
+2
+```
+
+Lexical order mein `10` `2` se pehle aa sakta hai; `-n` numeric value ke according sort karta hai.
+
+### 8.4 Unique sort
+
+```bash
+sort -u filename.txt
+```
+
+Sort ke saath duplicate lines remove karne ka compact form hai.
+
+### 8.5 Mixed data par caution
+
+Real data mein delimiter, header, numeric column aur locale matter karte hain. Advanced key options, delimiter (`-t`) aur numeric flags use karne se pehle sample output test karo.
 
 ---
 
-## Part 8 — `uniq`
+## 9. `uniq` command
 
-> **`uniq` deletes DUPLICATE entries.**
+`uniq` duplicate lines ko remove karne ke liye use hota hai, lekin important condition hai:
 
-### ⚠ The prerequisite everyone forgets
+> **`uniq` sirf adjacent/consecutive duplicate lines remove karta hai.**
 
-> **`uniq` only removes ADJACENT duplicates.** You must **`sort` first**, otherwise duplicates scattered through the file are never noticed.
+Input:
 
-### The one-liner
+```text
+apple
+banana
+apple
+```
+
+Direct `uniq` se dono `apple` lines remove nahi hongi, kyunki adjacent nahi hain.
+
+### 9.1 Correct pipeline
 
 ```bash
 cat tmp.txt | sort | uniq
 ```
 
-Breaking it down — a direct application of Day 3's redirection material:
+Steps:
 
-1. `cat tmp.txt` produces the file's contents
-2. `|` makes that the **input** of `sort`
-3. `sort` groups identical lines together
-4. `|` makes *that* the **input** of `uniq`
-5. `uniq` removes the now-adjacent duplicates
+1. `cat tmp.txt` contents output karta hai.
+2. Pipe `|` output ko `sort` ka input banata hai.
+3. `sort` identical lines ko adjacent/group karta hai.
+4. Second pipe sorted output ko `uniq` ka input banata hai.
+5. `uniq` consecutive duplicates ko one line mein reduce karta hai.
 
-> **This works ON SCREEN only** — redirect to a file if you want to keep the result:
+Shorter equivalent:
 
 ```bash
-cat tmp.txt | sort | uniq > cleaned.txt
-sort -u tmp.txt > cleaned.txt          # shorter equivalent
+sort -u tmp.txt
+```
+
+Output save karna:
+
+```bash
+sort tmp.txt | uniq > cleaned.txt
+```
+
+### 9.2 Count duplicates
+
+Useful extension:
+
+```bash
+sort tmp.txt | uniq -c
+```
+
+Har unique line ke saamne count show kar sakta hai.
+
+### 9.3 Case sensitivity
+
+`uniq` by default case-sensitive ho sakta hai:
+
+```text
+Apple
+apple
+```
+
+different lines treat ho sakti hain. Case-insensitive grouping chahiye to sort aur uniq flags/locales carefully configure karo, example:
+
+```bash
+sort -f tmp.txt | uniq -i
+```
+
+Exact locale behavior verify karo.
+
+---
+
+## 10. Pipe recap
+
+Pipe symbol:
+
+```bash
+|
+```
+
+ka meaning:
+
+> **Pehli command ka standard output doosri command ka standard input ban jata hai.**
+
+Example:
+
+```bash
+cat tmp.txt | sort
+```
+
+`sort` ko filename argument nahi diya gaya; usne data pipe se read kiya.
+
+Day 3 ke redirection concepts se connection:
+
+- `>` output ko file mein write karta hai.
+- `>>` output append karta hai.
+- `<` file ko input banata hai.
+- `|` ek command ka output next command ka input banata hai.
+
+Long pipeline debug karne ke liye stages alag test karo:
+
+```bash
+cat tmp.txt
+cat tmp.txt | sort
+cat tmp.txt | sort | uniq
 ```
 
 ---
 
-## Part 9 — Pipe recap
+## 11. Day 14 practical workflows
 
-A learner asked what `|` actually does. The answer, restated:
+### 11.1 Command history review
 
-> **The pipe takes the OUTPUT of the first command and makes it the INPUT of the second.** "Piping" is exactly that — joining.
+```bash
+history 20
+Ctrl+R
+```
 
-**Why it was needed here:** `sort` expects a **filename**. In `cat tmp.txt | sort`, no filename is given — so `sort` takes its input **from the pipe** instead.
+### 11.2 Log lines sort and deduplicate
 
-> Learners who find this unclear were directed back to **Day 3 and Day 4** on input/output redirection.
+```bash
+sort access.log | uniq > unique-lines.log
+```
+
+### 11.3 Frequency count
+
+```bash
+sort access.log | uniq -c | sort -nr > frequency.txt
+```
+
+Ye pipeline identical lines ko count karke count ke descending order mein arrange kar sakti hai. Actual log field extraction ke liye `awk`, `cut` ya `grep` add kar sakte ho.
+
+### 11.4 Package/file inventory
+
+```bash
+dpkg -L package-name | sort | uniq
+```
+
+Day 12 ke package management ke saath direct connection.
 
 ---
 
-## Part 10 — Complete cheat sheet
+## 12. Day 14 command summary
 
 ```bash
-# ---- history ----
-history                 # all entries
-history 10              # last 10
-!!                      # repeat previous command
-!string                 # repeat last command starting with "string"
-!1634                   # run entry number 1634
-Ctrl+R                  # reverse interactive search
-history -c              # clear all
-history -d 17           # delete entry 17
- command                # LEADING SPACE = not saved to history
+# History
+history
+history 10
+!!
+!prefix
+!1634
+history -c
+history -d 17
+history -a
+history -w
+Ctrl+R
 
-echo $HISTSIZE          # in-memory limit (default 1000)
-echo $HISTFILE          # ~/.bash_history
-HISTSIZE=5000           # temporary; put in ~/.bashrc to persist
+# History variables
+echo "$HISTFILE"
+echo "$HISTSIZE"
+echo "$HISTFILESIZE"
+echo "$HISTCONTROL"
 
-# ---- root password reset (Debian/Kali/Ubuntu ONLY) ----
-# 1. power on -> GRUB menu -> press 'e'
-# 2. find the "linux" line, go to the end
-# 3. delete:  ro quiet splash
-# 4. add:     rw init=/bin/bash
-# 5. Ctrl+X to boot
-mount                          # verify / is NOT mounted 'ro'
-mount -o remount,rw /          # only if it is
-passwd                         # set the new password
-exec /sbin/init                # reboot
+# Authorized Debian/Kali recovery overview
+# GRUB edit -> authorized rw recovery shell -> verify mount -> passwd
+mount
+mount -o remount,rw /
+passwd
+exec /sbin/init
 
-# ---- sort & uniq ----
+# Sort
 sort file.txt
-sort -k2 file.txt              # by column 2
-sort -r / -n / -u
-cat file.txt | sort | uniq     # remove duplicates
-sort -u file.txt               # shorter equivalent
+sort -r file.txt
+sort -n numbers.txt
+sort -k2 file.txt
+sort -u file.txt
+
+# Uniq and pipe
+sort file.txt | uniq
+sort file.txt | uniq -c
+sort -u file.txt
+cat file.txt | sort | uniq > cleaned.txt
 ```
 
 ---
 
-## Part 11 — Self-check questions
+## 13. Common mistakes aur safety points
 
-1. Where is command history stored? What is the default `HISTSIZE`?
-2. Give four ways to recall a previous command without retyping it.
-3. What does `!to` do? What happens if you've never run a command starting with `to`?
-4. What does `Ctrl+R` open?
-5. Name the three history environment variables and what each controls.
-6. When is history actually written to the file? Why does that matter in forensics?
-7. How do you stop a single command from being recorded? Why is this relevant to security from both sides?
-8. Which distributions is the GRUB password-reset procedure safe on? What happens if you try it elsewhere?
-9. List the six GRUB steps. What exactly do you replace at the end of the `linux` line?
-10. What does `init=/bin/bash` do, and why is `rw` needed?
-11. After booting, which directory are you in? What must you verify with `mount`, and what's the fix?
-12. Why do you run `exec /sbin/init` rather than just rebooting?
-13. What prerequisite does the entire procedure have? Name four defences against it.
-14. What does `sort -k2` do?
-15. Why must you `sort` before `uniq`? What happens if you don't?
-16. Explain `cat file | sort | uniq` step by step. Give the shorter equivalent.
-17. Restate what the pipe symbol does in one sentence.
+1. Shell history ko complete/audit-proof command record samajhna.
+2. Current session history file mein immediately written assume karna.
+3. Leading-space history suppression ko every shell par guaranteed samajhna.
+4. History clear karke audit evidence erase ho gaya samajhna.
+5. Root password recovery steps ko wrong distribution par blindly apply karna.
+6. Bootloader edit se pehle backup/console/recovery plan na rakhna.
+7. Root filesystem read-only hote hue `passwd` success expect karna.
+8. Physical access controls aur full-disk encryption ignore karna.
+9. `sort` ko numeric data par `-n` ke bina use karna.
+10. `uniq` ko unsorted/non-adjacent duplicates remove karne wala samajhna.
+11. Pipeline ko stages mein debug na karna.
+12. `sort -u` output ko original file mein automatically saved samajhna.
+13. `history -d`/`history -c` ko system-wide logs delete karne wala samajhna.
+14. Destructive recovery/password changes ko unauthorized machine par try karna.
 
 ---
 
-## Part 12 — What comes next
+## 14. Self-check questions
 
-### The OSINT course
+1. `history` command ka basic purpose kya hai?
+2. `!!`, `!prefix`, `!number` aur `Ctrl+R` ka use compare karo.
+3. `HISTFILE`, `HISTSIZE`, `HISTFILESIZE` aur `HISTCONTROL` kya control karte hain?
+4. Current shell history disk par kab write ho sakti hai? `history -a`/`-w` ka role kya hai?
+5. Leading-space history behavior kaunse setting par depend karta hai?
+6. History clear karne ke baad bhi system mein evidence kahan reh sakta hai?
+7. Root password recovery procedure kis family ke systems ke context mein hai?
+8. `init=/bin/bash` aur `rw` boot parameters ka conceptual role kya hai?
+9. Recovery shell mein `mount` kyu check karte hain?
+10. Physical access se bachne ke four controls likho.
+11. `sort -r`, `sort -n`, `sort -k2` aur `sort -u` ka meaning batao.
+12. `uniq` sirf adjacent duplicates kyu remove karta hai?
+13. `sort file | uniq` aur `sort -u file` ka relationship kya hai?
+14. Pipe standard input/output ke saath kaise work karta hai?
+15. `sort access.log | uniq -c | sort -nr` pipeline ko step by step explain karo.
+16. Output file save karne ke liye redirection kyu chahiye?
 
-> **Starting tomorrow at 6 PM: Open Source Intelligence.**
+---
 
-| Aspect | Detail |
-|---|---|
-| **What it is** | *"Information gathering's part itself"* — OSINT = **Open Source Intelligence** |
-| **Prerequisites** | **None.** *"Technical, non-technical, IT, non-IT — anyone can come, because this is general knowledge; it is a general-purpose course."* |
-| **Length** | *"Comfortably a 10 to 12 hour course"* |
+## 15. Kali capsule course ka conclusion
 
-> The trainer's view: *"Every single person should know how to do Open Source Intelligence, because if ever someone gets stuck in some trouble, they can get out of such a situation."*
+Day 14 ke saath course ke primary Linux fundamentals complete hote hain:
 
-This is why transcripts 015 and 017–020 belong to a different series interleaved with the remaining Kali sessions.
+- files/directories aur filesystem hierarchy,
+- redirection aur pipelines,
+- text-processing commands,
+- users/groups aur privileges,
+- standard/advanced file permissions,
+- package management,
+- variables, globbing aur shell control,
+- history aur common text utilities.
 
-### Possible future content
+Trainer ka next announcement **OSINT — Open Source Intelligence** course ka hai. OSINT ko general-purpose information gathering skill ke roop mein present kiya jata hai, jisme technical aur non-technical learners dono participate kar sakte hain.
 
-**Bash scripting** and **Python** were floated as possibilities, explicitly conditional on channel engagement.
+---
 
-### Advice for newcomers
+## 16. Final takeaway
 
-> *"Start watching our videos from the beginning. You will get each and every step in detail. Watch one video daily; if you have more time, watch two."*
+- `history` productivity shortcut bhi hai aur security/forensics artifact bhi.
+- History file complete real-time record nahi hoti; shell settings aur write timing matter karte hain.
+- Root-password recovery sirf owned/authorized Debian/Kali lab par practice karo; physical access security ko seriously lo.
+- `sort` lines/order/keys ko arrange karta hai.
+- `uniq` adjacent duplicates remove karta hai; duplicates group karne ke liye pehle `sort` useful hai.
+- Pipe ek command ka output next command ka input banata hai.
+- `sort | uniq`, `sort -u` aur count pipelines log/data analysis mein practical hain.
+
+Kali Linux capsule course ka broader lesson hai: commands ko isolated tricks ki tarah nahi, balki users, permissions, processes, files aur shell automation ke connected system ki tarah samjho.
